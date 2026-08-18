@@ -24,6 +24,10 @@ jwt:
 server:
   port: 8080
 
+resend:
+  api-key: ae_ddqjzEAT_KbtREgedreWQiuwx31wNSTcB
+  from: vendor@projectbuild.me
+
 springdoc:
   api-docs:
     path: /v3/api-docs
