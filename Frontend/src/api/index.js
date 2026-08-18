@@ -64,6 +64,8 @@ export const getInvoicesByContract = (contractId) =>
   api.get(`/contracts/${contractId}/invoices`)
 export const getAllInvoices = () => api.get('/invoices')
 export const getInvoice = (id) => api.get(`/invoices/${id}`)
+export const downloadInvoiceReport = (id) =>
+  api.get(`/invoices/${id}/report`, { responseType: 'blob' })
 
 // Milestones
 export const createMilestone = (contractId, data) =>

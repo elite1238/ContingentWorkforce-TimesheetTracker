@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  getAllInvoices, getContracts, generateInvoice, approveInvoice,
+  getAllInvoices, getContracts, generateInvoice, approveInvoice, downloadInvoiceReport,
 } from '../../api'
 import { useFetch } from '../../hooks/useFetch'
 import PageHeader from '../../components/PageHeader'
@@ -39,6 +39,21 @@ export default function Invoices() {
       invoices.reload()
     } catch (err) {
       setError(err?.response?.data?.message ?? 'Approve failed')
+    }
+  }
+
+  async function handleDownload(inv) {
+    setError(null)
+    try {
+      const blob = await downloadInvoiceReport(inv.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `invoice-${inv.id}-report.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError('Report download failed')
     }
   }
 
@@ -97,10 +112,11 @@ export default function Invoices() {
                     ${Number(inv.totalAmount ?? 0).toFixed(2)}
                   </td>
                   <td><StatusPill value={inv.status} /></td>
-                  <td>
+                  <td style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {inv.status === 'DRAFT' && (
                       <Btn small variant="approve" onClick={() => handleApprove(inv.id)}>APPROVE</Btn>
                     )}
+                    <Btn small onClick={() => handleDownload(inv)}>⬇ REPORT</Btn>
                   </td>
                 </tr>
               ))}

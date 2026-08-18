@@ -1,74 +1,91 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../auth/AuthContext'
-import { getMyAssignments } from '../../api'
-import { useFetch } from '../../hooks/useFetch'
-import PageHeader from '../../components/PageHeader'
-import Btn from '../../components/Btn'
-import StatusPill from '../../components/StatusPill'
-import Calendar from '../../components/Calendar'
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../auth/AuthContext";
+import { getMyAssignments } from "../../api";
+import { useFetch } from "../../hooks/useFetch";
+import PageHeader from "../../components/PageHeader";
+import Btn from "../../components/Btn";
+import StatusPill from "../../components/StatusPill";
+import Calendar from "../../components/Calendar";
 
 const ERR = {
-  padding: '10px 16px', background: '#ef444415', color: '#ef4444',
-  borderLeft: '2px solid #ef4444', marginBottom: 16,
-  fontFamily: 'monospace', fontSize: 12,
-}
+  padding: "10px 16px",
+  background: "#ef444415",
+  color: "#ef4444",
+  borderLeft: "2px solid #ef4444",
+  marginBottom: 16,
+  fontFamily: "monospace",
+  fontSize: 12,
+};
 
 function eachDate(startDate, endDate) {
-  const days = []
-  const cur = new Date(startDate)
-  const end = new Date(endDate)
+  const days = [];
+  const cur = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
   while (cur <= end) {
-    days.push(cur.toISOString().slice(0, 10))
-    cur.setDate(cur.getDate() + 1)
+    days.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
-  return days
+  return days;
 }
 
 export default function MyAssignments() {
-  const { user } = useAuth()
-  const navigate  = useNavigate()
-  const empId     = user?.employeeId ?? null
-  const [view, setView] = useState('calendar')
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const empId = user?.employeeId ?? null;
+  const [view, setView] = useState("calendar");
 
   const { data, loading, error } = useFetch(
-    () => empId ? getMyAssignments(empId) : Promise.resolve([]),
+    () => (empId ? getMyAssignments(empId) : Promise.resolve([])),
     [empId],
-  )
+  );
 
-  const assignments = data ?? []
+  const assignments = data ?? [];
 
-  const events = useMemo(() => (
-    assignments
-      .filter(a => a.status === 'ACTIVE')
-      .flatMap(a => eachDate(a.startDate, a.endDate).map(d => ({
-        id: `${a.id}-${d}`,
-        title: `${a.contractTitle} · ${a.skillName}`,
-        start: `${d}T${a.plannedStartTime}`,
-        end:   `${d}T${a.plannedEndTime}`,
-        extendedProps: { assignment: a, workDate: d },
-      })))
-  ), [assignments])
+  const events = useMemo(
+    () =>
+      assignments
+        .filter((a) => a.status === "ACTIVE")
+        .flatMap((a) =>
+          eachDate(a.startDate, a.endDate).map((d) => ({
+            id: `${a.id}-${d}`,
+            title: `${a.contractTitle} · ${a.skillName}`,
+            start: `${d}T${a.plannedStartTime}`,
+            end: `${d}T${a.plannedEndTime}`,
+            extendedProps: { assignment: a, workDate: d },
+          })),
+        ),
+    [assignments],
+  );
 
   if (!empId) {
     return (
       <div>
         <PageHeader title="My Assignments" subtitle="Active work assignments" />
-        <div style={{ padding: '60px 32px', textAlign: 'center' }}>
-          <div style={{ color: '#7a9ab0', fontFamily: 'monospace', fontSize: 13, marginBottom: 8 }}>
+        <div style={{ padding: "60px 32px", textAlign: "center" }}>
+          <div
+            style={{
+              color: "#7a9ab0",
+              fontFamily: "monospace",
+              fontSize: 13,
+              marginBottom: 8,
+            }}
+          >
             Employee profile not linked to this account.
           </div>
-          <div style={{ color: '#7a9ab0', fontFamily: 'monospace', fontSize: 11 }}>
+          <div
+            style={{ color: "#7a9ab0", fontFamily: "monospace", fontSize: 11 }}
+          >
             Contact HR to have your employee record associated with your login.
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   function onEventClick(info) {
-    const { assignment, workDate } = info.event.extendedProps
-    navigate(`/my-worklogs/new?assignmentId=${assignment.id}&date=${workDate}`)
+    const { assignment, workDate } = info.event.extendedProps;
+    navigate(`/my-worklogs/new?assignmentId=${assignment.id}&date=${workDate}`);
   }
 
   return (
@@ -77,23 +94,52 @@ export default function MyAssignments() {
         title="My Assignments"
         subtitle="Active work assignments"
         action={
-          <div style={{ display: 'flex', gap: 6 }}>
-            <Btn small variant={view === 'calendar' ? 'primary' : 'ghost'} onClick={() => setView('calendar')}>CALENDAR</Btn>
-            <Btn small variant={view === 'list' ? 'primary' : 'ghost'} onClick={() => setView('list')}>LIST</Btn>
+          <div style={{ display: "flex", gap: 6 }}>
+            <Btn
+              small
+              variant={view === "calendar" ? "primary" : "ghost"}
+              onClick={() => setView("calendar")}
+            >
+              CALENDAR
+            </Btn>
+            <Btn
+              small
+              variant={view === "list" ? "primary" : "ghost"}
+              onClick={() => setView("list")}
+            >
+              LIST
+            </Btn>
           </div>
         }
       />
-      <div style={{ padding: '24px 32px' }}>
+      <div style={{ padding: "24px 32px" }}>
         {error && <div style={ERR}>ERROR: {error}</div>}
 
         {loading ? (
-          <div style={{ color: '#7a9ab0', fontFamily: 'monospace', fontSize: 12 }}>Loading...</div>
+          <div
+            style={{ color: "#7a9ab0", fontFamily: "monospace", fontSize: 12 }}
+          >
+            Loading...
+          </div>
         ) : assignments.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#7a9ab0', fontFamily: 'monospace', fontSize: 13 }}>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "60px 0",
+              color: "#7a9ab0",
+              fontFamily: "monospace",
+              fontSize: 13,
+            }}
+          >
             No assignments found
           </div>
-        ) : view === 'calendar' ? (
-          <Calendar events={events} view="timeGridWeek" onEventClick={onEventClick} height={640} />
+        ) : view === "calendar" ? (
+          <Calendar
+            events={events}
+            view="timeGridWeek"
+            onEventClick={onEventClick}
+            height={640}
+          />
         ) : (
           <table>
             <thead>
@@ -109,20 +155,27 @@ export default function MyAssignments() {
               </tr>
             </thead>
             <tbody>
-              {assignments.map(a => (
+              {assignments.map((a) => (
                 <tr key={a.id}>
-                  <td style={{ color: '#f0f2f5', fontWeight: 600 }}>
-                    {a.contractTitle ?? a.contractId ?? '—'}
+                  <td style={{ color: "#f0f2f5", fontWeight: 600 }}>
+                    {a.contractTitle ?? a.contractId ?? "—"}
                   </td>
-                  <td>{a.skillName ?? '—'}</td>
+                  <td>{a.skillName ?? "—"}</td>
                   <td>{a.startDate}</td>
                   <td>{a.endDate}</td>
-                  <td>{a.plannedStartTime ?? '—'}</td>
-                  <td>{a.plannedEndTime ?? '—'}</td>
-                  <td><StatusPill value={a.status ?? 'ACTIVE'} /></td>
+                  <td>{a.plannedStartTime ?? "—"}</td>
+                  <td>{a.plannedEndTime ?? "—"}</td>
                   <td>
-                    {a.status !== 'CANCELLED' && (
-                      <Btn small onClick={() => navigate(`/my-worklogs/new?assignmentId=${a.id}`)}>
+                    <StatusPill value={a.status ?? "ACTIVE"} />
+                  </td>
+                  <td>
+                    {a.status !== "CANCELLED" && (
+                      <Btn
+                        small
+                        onClick={() =>
+                          navigate(`/my-worklogs/new?assignmentId=${a.id}`)
+                        }
+                      >
                         SUBMIT LOG
                       </Btn>
                     )}
@@ -134,5 +187,5 @@ export default function MyAssignments() {
         )}
       </div>
     </div>
-  )
+  );
 }
