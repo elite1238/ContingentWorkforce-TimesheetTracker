@@ -1,5 +1,7 @@
 package backend.WF.contract;
 
+import backend.WF.billing.BillingTypeEntity;
+import backend.WF.billing.BillingTypeRepository;
 import backend.WF.company.ClientCompany;
 import backend.WF.company.CompanyRepository;
 import backend.WF.exception.EntityNotFoundException;
@@ -20,17 +22,21 @@ public class ContractService {
     private final ContractRequirementRepository requirementRepository;
     private final CompanyRepository companyRepository;
     private final SkillRepository skillRepository;
+    private final BillingTypeRepository billingTypeRepository;
 
     @Transactional
     public ContractResponse createContract(ContractCreateRequest request) {
         ClientCompany company = companyRepository.findById(request.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("ClientCompany", request.getCompanyId()));
 
+        BillingTypeEntity billingType = billingTypeRepository.findById(request.getBillingTypeId())
+                .orElseThrow(() -> new EntityNotFoundException("BillingType", request.getBillingTypeId()));
+
         Contract contract = Contract.builder()
                 .company(company)
                 .title(request.getTitle())
                 .description(request.getDescription())
-                .billingType(request.getBillingType())
+                .billingType(billingType)
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .active(true)
@@ -47,6 +53,7 @@ public class ContractService {
                         .requiredEmployeeCount(rr.getRequiredEmployeeCount())
                         .hourlyRate(rr.getHourlyRate())
                         .expectedHoursPerDay(rr.getExpectedHoursPerDay())
+                        .minProficiency(rr.getMinProficiency())
                         .startDate(rr.getStartDate())
                         .endDate(rr.getEndDate())
                         .build();
@@ -100,6 +107,7 @@ public class ContractService {
                 .requiredEmployeeCount(request.getRequiredEmployeeCount())
                 .hourlyRate(request.getHourlyRate())
                 .expectedHoursPerDay(request.getExpectedHoursPerDay())
+                .minProficiency(request.getMinProficiency())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .build();
@@ -120,13 +128,16 @@ public class ContractService {
         List<RequirementResponse> reqs = c.getRequirements().stream()
                 .map(this::toRequirementResponse)
                 .toList();
+        BillingTypeEntity bt = c.getBillingType();
         return ContractResponse.builder()
                 .id(c.getId())
                 .companyId(c.getCompany().getId())
                 .companyName(c.getCompany().getName())
                 .title(c.getTitle())
                 .description(c.getDescription())
-                .billingType(c.getBillingType())
+                .billingTypeId(bt != null ? bt.getId() : null)
+                .billingTypeCode(bt != null ? bt.getCode() : null)
+                .billingTypeLabel(bt != null ? bt.getLabel() : null)
                 .startDate(c.getStartDate())
                 .endDate(c.getEndDate())
                 .active(c.isActive())
@@ -142,6 +153,7 @@ public class ContractService {
                 .requiredEmployeeCount(r.getRequiredEmployeeCount())
                 .hourlyRate(r.getHourlyRate())
                 .expectedHoursPerDay(r.getExpectedHoursPerDay())
+                .minProficiency(r.getMinProficiency())
                 .startDate(r.getStartDate())
                 .endDate(r.getEndDate())
                 .fulfilledCount(r.getFulfilledCount())

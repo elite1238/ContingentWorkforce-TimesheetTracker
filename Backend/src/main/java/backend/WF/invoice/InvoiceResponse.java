@@ -21,6 +21,7 @@ public class InvoiceResponse {
     private BigDecimal totalAmount;
     private InvoiceStatus status;
     private LocalDateTime approvedAt;
+    private UUID milestoneId;
     private List<LineItemResponse> lineItems;
 
     @Getter

@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { getMyWorklogs } from '../../api'
@@ -5,6 +6,7 @@ import { useFetch } from '../../hooks/useFetch'
 import PageHeader from '../../components/PageHeader'
 import Btn from '../../components/Btn'
 import StatusPill from '../../components/StatusPill'
+import Calendar from '../../components/Calendar'
 
 const ERR = {
   padding: '10px 16px', background: '#ef444415', color: '#ef4444',
@@ -13,7 +15,7 @@ const ERR = {
 }
 
 function totalHours(segments) {
-  if (!segments?.length) return '—'
+  if (!segments?.length) return null
   let mins = 0
   for (const s of segments) {
     const [sh, sm] = s.startTime.split(':').map(Number)
@@ -23,10 +25,20 @@ function totalHours(segments) {
   return (mins / 60).toFixed(2)
 }
 
+function statusClass(status) {
+  switch (status) {
+    case 'APPROVED':  return 'wb-approved'
+    case 'REJECTED':  return 'wb-rejected'
+    case 'SUBMITTED': return 'wb-submitted'
+    default:          return ''
+  }
+}
+
 export default function MyWorklogs() {
   const { user } = useAuth()
   const navigate  = useNavigate()
   const empId     = user?.employeeId ?? null
+  const [view, setView] = useState('calendar')
 
   const { data, loading, error } = useFetch(
     () => empId ? getMyWorklogs(empId) : Promise.resolve([]),
@@ -34,6 +46,19 @@ export default function MyWorklogs() {
   )
 
   const worklogs = data ?? []
+
+  const events = useMemo(() => (
+    worklogs.flatMap(w =>
+      (w.segments ?? []).map((seg, i) => ({
+        id: `${w.id}-${i}`,
+        title: w.status,
+        start: `${w.workDate}T${seg.startTime}`,
+        end:   `${w.workDate}T${seg.endTime}`,
+        classNames: [statusClass(w.status)],
+        extendedProps: { worklog: w },
+      })),
+    )
+  ), [worklogs])
 
   if (!empId) {
     return (
@@ -44,7 +69,7 @@ export default function MyWorklogs() {
             Employee profile not linked to this account.
           </div>
           <div style={{ color: '#7a9ab0', fontFamily: 'monospace', fontSize: 11 }}>
-            Contact your manager to have your employee record associated with your login.
+            Contact HR to have your employee record associated with your login.
           </div>
         </div>
       </div>
@@ -56,7 +81,13 @@ export default function MyWorklogs() {
       <PageHeader
         title="My Worklogs"
         subtitle="Submitted timesheets"
-        action={<Btn onClick={() => navigate('/my-worklogs/new')}>+ SUBMIT WORKLOG</Btn>}
+        action={
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Btn small variant={view === 'calendar' ? 'primary' : 'ghost'} onClick={() => setView('calendar')}>CALENDAR</Btn>
+            <Btn small variant={view === 'list' ? 'primary' : 'ghost'} onClick={() => setView('list')}>LIST</Btn>
+            <Btn onClick={() => navigate('/my-worklogs/new')}>+ SUBMIT WORKLOG</Btn>
+          </div>
+        }
       />
       <div style={{ padding: '24px 32px' }}>
         {error && <div style={ERR}>ERROR: {error}</div>}
@@ -68,6 +99,8 @@ export default function MyWorklogs() {
             <div style={{ marginBottom: 16 }}>No worklogs submitted yet</div>
             <Btn onClick={() => navigate('/my-worklogs/new')}>+ Submit first worklog</Btn>
           </div>
+        ) : view === 'calendar' ? (
+          <Calendar events={events} view="timeGridWeek" height={640} />
         ) : (
           <table>
             <thead>
@@ -81,24 +114,29 @@ export default function MyWorklogs() {
               </tr>
             </thead>
             <tbody>
-              {worklogs.map(w => (
-                <tr key={w.id}>
-                  <td style={{ color: '#f0f2f5' }}>
-                    {w.contractTitle ?? w.assignmentId ?? '—'}
-                  </td>
-                  <td>{w.workDate}</td>
-                  <td style={{ color: '#ff6b00', fontWeight: 700 }}>
-                    {w.totalHours != null ? `${w.totalHours}h` : totalHours(w.segments) !== '—' ? `${totalHours(w.segments)}h` : '—'}
-                  </td>
-                  <td><StatusPill value={w.status} /></td>
-                  <td style={{ color: '#7a9ab0' }}>
-                    {w.submittedAt ? new Date(w.submittedAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td style={{ color: '#ef4444', fontSize: 11 }}>
-                    {w.rejectionReason ?? '—'}
-                  </td>
-                </tr>
-              ))}
+              {worklogs.map(w => {
+                const hrs = w.totalActualMinutes != null
+                  ? (w.totalActualMinutes / 60).toFixed(2)
+                  : totalHours(w.segments)
+                return (
+                  <tr key={w.id}>
+                    <td style={{ color: '#f0f2f5' }}>
+                      {w.contractTitle ?? w.assignmentId ?? '—'}
+                    </td>
+                    <td>{w.workDate}</td>
+                    <td style={{ color: '#ff6b00', fontWeight: 700 }}>
+                      {hrs != null ? `${hrs}h` : '—'}
+                    </td>
+                    <td><StatusPill value={w.status} /></td>
+                    <td style={{ color: '#7a9ab0' }}>
+                      {w.submittedAt ? new Date(w.submittedAt).toLocaleDateString() : '—'}
+                    </td>
+                    <td style={{ color: '#ef4444', fontSize: 11 }}>
+                      {w.rejectionReason ?? '—'}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}

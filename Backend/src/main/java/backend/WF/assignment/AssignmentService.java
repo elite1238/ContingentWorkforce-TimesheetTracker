@@ -120,6 +120,13 @@ public class AssignmentService {
     }
 
     @Transactional(readOnly = true)
+    public List<AssignmentResponse> getAssignmentsByContract(UUID contractId) {
+        return assignmentRepository.findByContractId(contractId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<AssignmentResponse> getMyAssignments(UUID employeeId) {
         return assignmentRepository.findByEmployeeIdAndStatus(employeeId, AssignmentStatus.ACTIVE).stream()
                 .map(this::toResponse)

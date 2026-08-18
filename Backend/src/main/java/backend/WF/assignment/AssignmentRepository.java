@@ -29,4 +29,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, UUID> {
             @Param("employeeId") UUID employeeId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT a FROM Assignment a WHERE a.requirement.contract.id = :contractId")
+    List<Assignment> findByContractId(@Param("contractId") UUID contractId);
 }

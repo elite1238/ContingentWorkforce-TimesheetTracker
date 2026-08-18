@@ -45,12 +45,41 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
-  const isManager = user?.roles?.includes('MANAGER')
-  const isEmployee = user?.roles?.includes('EMPLOYEE')
+  const roles = user?.roles ?? []
+  const isManager = roles.includes('MANAGER')
+  const isEmployee = roles.includes('EMPLOYEE')
+  const isHR = roles.includes('HR_MANAGER')
+  const isFinance = roles.includes('FINANCE_MANAGER')
   const hasPermission = (p) => user?.permissions?.includes(p)
+  const hasAnyRole = (...names) => names.some((n) => roles.includes(n))
+  const hasAnyPermission = (...perms) => perms.some((p) => user?.permissions?.includes(p))
+
+  const defaultRoute = isHR
+    ? '/hr/employees'
+    : isFinance
+    ? '/finance/invoices'
+    : isManager
+    ? '/dashboard'
+    : isEmployee
+    ? '/my-assignments'
+    : '/login'
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isManager, isEmployee, hasPermission }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        isManager,
+        isEmployee,
+        isHR,
+        isFinance,
+        hasPermission,
+        hasAnyRole,
+        hasAnyPermission,
+        defaultRoute,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

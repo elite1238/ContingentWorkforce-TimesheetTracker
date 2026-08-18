@@ -19,6 +19,11 @@ import java.util.stream.Collectors;
 public class HourlyInvoiceStrategy implements InvoiceCalculationStrategy {
 
     @Override
+    public String supportedCode() {
+        return "HOURLY";
+    }
+
+    @Override
     public List<InvoiceLineItem> calculate(Contract contract, List<WorkLog> approvedLogs,
                                            LocalDate periodStart, LocalDate periodEnd) {
         // Group approved logs by requirement

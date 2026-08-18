@@ -16,7 +16,9 @@ public class ContractResponse {
     private String companyName;
     private String title;
     private String description;
-    private BillingType billingType;
+    private UUID billingTypeId;
+    private String billingTypeCode;
+    private String billingTypeLabel;
     private LocalDate startDate;
     private LocalDate endDate;
     private boolean active;

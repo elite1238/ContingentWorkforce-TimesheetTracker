@@ -2,13 +2,12 @@ package backend.WF.invoice;
 
 import backend.WF.assignment.Assignment;
 import backend.WF.billing.BillingStrategyRegistry;
-import backend.WF.billing.HourlyInvoiceStrategy;
 import backend.WF.billing.InvoiceCalculationStrategy;
-import backend.WF.contract.BillingType;
 import backend.WF.contract.Contract;
 import backend.WF.contract.ContractRepository;
 import backend.WF.contract.ContractRequirement;
 import backend.WF.exception.BusinessRuleViolationException;
+import backend.WF.milestone.ContractMilestone;
 import backend.WF.security.CurrentUserService;
 import backend.WF.security.User;
 import backend.WF.worklog.WorkLog;
@@ -61,7 +60,7 @@ class InvoiceServiceTest {
         contract = mock(Contract.class);
         when(contract.getId()).thenReturn(contractId);
         when(contract.getTitle()).thenReturn("Test Contract");
-        when(contract.getBillingType()).thenReturn(BillingType.HOURLY);
+        when(contract.getBillingCode()).thenReturn("HOURLY");
 
         currentUser = mock(User.class);
         when(currentUser.getId()).thenReturn(UUID.randomUUID());
@@ -71,7 +70,6 @@ class InvoiceServiceTest {
 
     @Test
     void generateInvoice_totalIsServerComputed_notFromClient() {
-        // 120 approved minutes @ ₹100/hr → ₹200
         WorkLog approvedLog = buildApprovedWorkLog(120, new BigDecimal("100.00"));
 
         when(contractRepository.findById(contractId)).thenReturn(Optional.of(contract));
@@ -89,7 +87,7 @@ class InvoiceServiceTest {
 
         InvoiceCalculationStrategy strategy = mock(InvoiceCalculationStrategy.class);
         when(strategy.calculate(any(), any(), any(), any())).thenReturn(List.of(lineItem));
-        when(billingStrategyRegistry.resolve(BillingType.HOURLY)).thenReturn(strategy);
+        when(billingStrategyRegistry.resolve("HOURLY")).thenReturn(strategy);
 
         Invoice savedInvoice = buildMockInvoice(new BigDecimal("200.00"));
         when(invoiceRepository.save(any())).thenReturn(savedInvoice);
@@ -102,7 +100,6 @@ class InvoiceServiceTest {
 
     @Test
     void generateInvoice_onlyApprovedLogsUsed() {
-        // Verify findApprovedLogsForContract is called — it filters to APPROVED only
         when(contractRepository.findById(contractId)).thenReturn(Optional.of(contract));
         when(invoiceRepository.findByContractIdAndPeriodStartAndPeriodEnd(any(), any(), any()))
                 .thenReturn(Optional.empty());
@@ -111,14 +108,13 @@ class InvoiceServiceTest {
 
         InvoiceCalculationStrategy strategy = mock(InvoiceCalculationStrategy.class);
         when(strategy.calculate(any(), any(), any(), any())).thenReturn(List.of());
-        when(billingStrategyRegistry.resolve(BillingType.HOURLY)).thenReturn(strategy);
+        when(billingStrategyRegistry.resolve("HOURLY")).thenReturn(strategy);
 
         Invoice emptyInvoice = buildMockInvoice(BigDecimal.ZERO);
         when(invoiceRepository.save(any())).thenReturn(emptyInvoice);
 
         InvoiceResponse response = invoiceService.generateInvoice(buildRequest());
 
-        // Total is zero because no approved logs — draft/submitted logs are excluded
         assertEquals(BigDecimal.ZERO, response.getTotalAmount());
     }
 
@@ -140,6 +136,37 @@ class InvoiceServiceTest {
 
         assertThrows(BusinessRuleViolationException.class,
                 () -> invoiceService.approveInvoice(UUID.randomUUID()));
+    }
+
+    @Test
+    void generateMilestoneInvoice_createsSingleLineFromMilestoneAmount() {
+        UUID milestoneId = UUID.randomUUID();
+        ContractMilestone milestone = mock(ContractMilestone.class);
+        when(milestone.getId()).thenReturn(milestoneId);
+        when(milestone.getContract()).thenReturn(contract);
+        when(milestone.getLabel()).thenReturn("MVP");
+        when(milestone.getAmount()).thenReturn(new BigDecimal("10000.00"));
+        when(contract.getBillingCode()).thenReturn("MILESTONE");
+
+        InvoiceLineItem line = InvoiceLineItem.builder()
+                .description("Milestone: MVP")
+                .quantity(BigDecimal.ONE)
+                .unitRate(new BigDecimal("10000.00"))
+                .amount(new BigDecimal("10000.00"))
+                .build();
+
+        InvoiceCalculationStrategy strategy = mock(InvoiceCalculationStrategy.class);
+        when(strategy.calculateForMilestone(contract, milestone)).thenReturn(List.of(line));
+        when(billingStrategyRegistry.resolve("MILESTONE")).thenReturn(strategy);
+
+        Invoice saved = buildMockInvoice(new BigDecimal("10000.00"));
+        when(saved.getMilestoneId()).thenReturn(milestoneId);
+        when(invoiceRepository.save(any())).thenReturn(saved);
+
+        InvoiceResponse response = invoiceService.generateMilestoneInvoice(milestone);
+
+        assertEquals(new BigDecimal("10000.00"), response.getTotalAmount());
+        assertEquals(milestoneId, response.getMilestoneId());
     }
 
     private InvoiceGenerateRequest buildRequest() {

@@ -13,4 +13,7 @@ public interface EmployeeSkillRepository extends JpaRepository<EmployeeSkill, UU
     Optional<EmployeeSkill> findByEmployeeIdAndSkillId(UUID employeeId, UUID skillId);
 
     boolean existsByEmployeeIdAndSkillId(UUID employeeId, UUID skillId);
+
+    boolean existsByEmployeeIdAndSkillIdAndProficiencyLevelGreaterThanEqual(
+            UUID employeeId, UUID skillId, int proficiencyLevel);
 }

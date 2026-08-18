@@ -44,10 +44,21 @@ public class WorkLogController {
         return ResponseEntity.ok(ApiResponse.ok(workLogService.getWorkLogsForApproval(from, to)));
     }
 
+    @GetMapping("/approved")
+    @PreAuthorize("hasAuthority('VIEW_TIMESHEETS')")
+    public ResponseEntity<ApiResponse<List<WorkLogResponse>>> getApprovedWorkLogs() {
+        return ResponseEntity.ok(ApiResponse.ok(workLogService.getByStatus(WorkLogStatus.APPROVED)));
+    }
+
     @GetMapping("/mine")
     @PreAuthorize("hasAuthority('VIEW_OWN_TIMESHEETS')")
     public ResponseEntity<ApiResponse<List<WorkLogResponse>>> getMyWorkLogs(
-            @RequestParam UUID employeeId) {
+            @RequestParam UUID employeeId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        if (from != null && to != null) {
+            return ResponseEntity.ok(ApiResponse.ok(workLogService.getMyWorkLogsBetween(employeeId, from, to)));
+        }
         return ResponseEntity.ok(ApiResponse.ok(workLogService.getMyWorkLogs(employeeId)));
     }
 }

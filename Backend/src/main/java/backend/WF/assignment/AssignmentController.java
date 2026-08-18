@@ -41,6 +41,13 @@ public class AssignmentController {
         return ResponseEntity.ok(ApiResponse.ok(assignmentService.getAssignmentsByRequirement(requirementId)));
     }
 
+    @GetMapping("/api/contracts/{contractId}/assignments")
+    @PreAuthorize("hasAuthority('VIEW_ASSIGNMENTS')")
+    public ResponseEntity<ApiResponse<List<AssignmentResponse>>> getAssignmentsByContract(
+            @PathVariable UUID contractId) {
+        return ResponseEntity.ok(ApiResponse.ok(assignmentService.getAssignmentsByContract(contractId)));
+    }
+
     @GetMapping("/api/requirements/{requirementId}/eligible-employees")
     @PreAuthorize("hasAuthority('CREATE_ASSIGNMENT')")
     public ResponseEntity<ApiResponse<List<EmployeeResponse>>> getEligibleEmployees(

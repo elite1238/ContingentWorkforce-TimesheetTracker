@@ -13,6 +13,10 @@ public interface WorkLogRepository extends JpaRepository<WorkLog, UUID> {
 
     List<WorkLog> findByEmployeeId(UUID employeeId);
 
+    List<WorkLog> findByEmployeeIdAndWorkDateBetween(UUID employeeId, LocalDate from, LocalDate to);
+
+    List<WorkLog> findByStatus(WorkLogStatus status);
+
     List<WorkLog> findByEmployeeIdAndWorkDate(UUID employeeId, LocalDate workDate);
 
     List<WorkLog> findByAssignmentIdAndStatus(UUID assignmentId, WorkLogStatus status);
@@ -35,4 +39,13 @@ public interface WorkLogRepository extends JpaRepository<WorkLog, UUID> {
     List<WorkLog> findActiveLogsForEmployeeOnDate(
             @Param("employeeId") UUID employeeId,
             @Param("workDate") LocalDate workDate);
+
+    @Query("SELECT DISTINCT wl FROM WorkLog wl LEFT JOIN FETCH wl.segments " +
+           "WHERE wl.assignment.requirement.contract.id = :contractId " +
+           "AND wl.status = 'APPROVED' " +
+           "AND wl.workDate >= :periodStart AND wl.workDate <= :periodEnd")
+    List<WorkLog> findApprovedLogsForContractWithSegments(
+            @Param("contractId") UUID contractId,
+            @Param("periodStart") LocalDate periodStart,
+            @Param("periodEnd") LocalDate periodEnd);
 }

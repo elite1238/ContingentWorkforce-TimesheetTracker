@@ -2,13 +2,11 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
 const MANAGER_NAV = [
-  { to: '/dashboard',       label: 'DASHBOARD' },
-  { to: '/contracts',       label: 'CONTRACTS' },
-  { to: '/clients',         label: 'CLIENTS' },
-  { to: '/employees',       label: 'EMPLOYEES' },
-  { to: '/skills',          label: 'SKILLS' },
+  { to: '/dashboard',        label: 'DASHBOARD' },
+  { to: '/contracts',        label: 'CONTRACTS' },
+  { to: '/clients',          label: 'CLIENTS' },
+  { to: '/employees',        label: 'EMPLOYEES' },
   { to: '/worklogs/pending', label: 'APPROVALS' },
-  { to: '/invoices',        label: 'INVOICES' },
 ]
 
 const EMPLOYEE_NAV = [
@@ -17,10 +15,43 @@ const EMPLOYEE_NAV = [
   { to: '/my-availability', label: 'AVAILABILITY' },
 ]
 
-export default function Shell({ role, children }) {
-  const { user, logout } = useAuth()
+const HR_NAV = [
+  { to: '/hr/employees', label: 'EMPLOYEES' },
+  { to: '/hr/users',     label: 'USERS' },
+  { to: '/hr/roles',     label: 'ROLES' },
+  { to: '/hr/skills',    label: 'SKILLS' },
+]
+
+const FINANCE_NAV = [
+  { to: '/finance/worklogs',   label: 'WORKLOGS' },
+  { to: '/finance/invoices',   label: 'INVOICES' },
+  { to: '/finance/milestones', label: 'MILESTONES' },
+]
+
+function buildNav({ isHR, isFinance, isManager, isEmployee }) {
+  const combined = []
+  if (isHR) combined.push(...HR_NAV)
+  if (isManager) combined.push(...MANAGER_NAV)
+  if (isFinance) combined.push(...FINANCE_NAV)
+  if (isEmployee) combined.push(...EMPLOYEE_NAV)
+  const seen = new Set()
+  return combined.filter((n) => (seen.has(n.to) ? false : seen.add(n.to)))
+}
+
+function activeBadge({ isHR, isFinance, isManager, isEmployee }) {
+  const badges = []
+  if (isHR) badges.push('HR')
+  if (isManager) badges.push('MANAGER')
+  if (isFinance) badges.push('FINANCE')
+  if (isEmployee) badges.push('EMPLOYEE')
+  return badges.join(' · ')
+}
+
+export default function Shell({ children }) {
+  const auth = useAuth()
+  const { user, logout } = auth
   const navigate = useNavigate()
-  const nav = role === 'MANAGER' ? MANAGER_NAV : EMPLOYEE_NAV
+  const nav = buildNav(auth)
 
   function handleLogout() {
     logout()
@@ -29,7 +60,6 @@ export default function Shell({ role, children }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
-      {/* Nav rail */}
       <nav style={{
         width: 200,
         minWidth: 200,
@@ -42,17 +72,15 @@ export default function Shell({ role, children }) {
         height: '100vh',
         flexShrink: 0,
       }}>
-        {/* Wordmark */}
         <div style={{ padding: '20px 16px 24px', borderBottom: '1px solid #1e3a4a' }}>
           <div style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 13, fontWeight: 700, letterSpacing: '0.12em', color: '#ff6b00' }}>
             WORKBRIDGE
           </div>
           <div style={{ fontSize: 10, color: '#7a9ab0', letterSpacing: '0.08em', marginTop: 2 }}>
-            {role === 'MANAGER' ? 'MANAGER' : 'EMPLOYEE'} · {user?.username?.toUpperCase()}
+            {activeBadge(auth)} · {user?.username?.toUpperCase()}
           </div>
         </div>
 
-        {/* Nav links */}
         <div style={{ flex: 1, padding: '12px 0', overflowY: 'auto' }}>
           {nav.map(({ to, label }) => (
             <NavLink
@@ -77,7 +105,6 @@ export default function Shell({ role, children }) {
           ))}
         </div>
 
-        {/* Logout */}
         <div style={{ padding: '12px 16px', borderTop: '1px solid #1e3a4a' }}>
           <button
             onClick={handleLogout}
@@ -101,7 +128,6 @@ export default function Shell({ role, children }) {
         </div>
       </nav>
 
-      {/* Main content */}
       <main style={{ flex: 1, minWidth: 0, overflowY: 'auto', background: '#010b13' }}>
         {children}
       </main>
