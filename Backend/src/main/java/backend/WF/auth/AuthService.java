@@ -1,0 +1,65 @@
+package backend.WF.auth;
+
+import backend.WF.security.CustomUserDetailsService;
+import backend.WF.security.JwtService;
+import backend.WF.security.User;
+import backend.WF.security.UserRepository;
+import backend.WF.exception.EntityNotFoundException;
+import backend.WF.employee.Employee;
+import backend.WF.employee.EmployeeRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final AuthenticationManager authenticationManager;
+    private final CustomUserDetailsService userDetailsService;
+    private final JwtService jwtService;
+    private final UserRepository userRepository;
+    private final EmployeeRepository employeeRepository;
+
+    @Transactional(readOnly = true)
+    public LoginResponse login(LoginRequest request) {
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
+        String token = jwtService.generateToken(userDetails);
+
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + request.getUsername()));
+
+        List<String> roles = user.getRoles().stream()
+                .map(r -> r.getName())
+                .toList();
+
+        List<String> permissions = user.getRoles().stream()
+                .flatMap(r -> r.getPermissions().stream())
+                .map(p -> p.getCode())
+                .distinct()
+                .toList();
+
+        String employeeId = null;
+        Employee employee = employeeRepository.findByUserId(user.getId()).orElse(null);
+        if (employee != null) {
+            employeeId = employee.getId().toString();
+        }
+
+        return LoginResponse.builder()
+                .token(token)
+                .username(user.getUsername())
+                .employeeId(employeeId)
+                .roles(roles)
+                .permissions(permissions)
+                .build();
+    }
+}

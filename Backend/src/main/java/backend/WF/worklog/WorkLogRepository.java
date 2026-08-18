@@ -1,0 +1,38 @@
+package backend.WF.worklog;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface WorkLogRepository extends JpaRepository<WorkLog, UUID> {
+
+    List<WorkLog> findByEmployeeId(UUID employeeId);
+
+    List<WorkLog> findByEmployeeIdAndWorkDate(UUID employeeId, LocalDate workDate);
+
+    List<WorkLog> findByAssignmentIdAndStatus(UUID assignmentId, WorkLogStatus status);
+
+    List<WorkLog> findByStatusAndWorkDateBetween(WorkLogStatus status, LocalDate start, LocalDate end);
+
+    Optional<WorkLog> findByAssignmentIdAndWorkDate(UUID assignmentId, LocalDate workDate);
+
+    @Query("SELECT wl FROM WorkLog wl WHERE wl.assignment.requirement.contract.id = :contractId " +
+           "AND wl.status = 'APPROVED' " +
+           "AND wl.workDate >= :periodStart AND wl.workDate <= :periodEnd")
+    List<WorkLog> findApprovedLogsForContract(
+            @Param("contractId") UUID contractId,
+            @Param("periodStart") LocalDate periodStart,
+            @Param("periodEnd") LocalDate periodEnd);
+
+    @Query("SELECT wl FROM WorkLog wl JOIN wl.segments s " +
+           "WHERE wl.employee.id = :employeeId AND wl.workDate = :workDate " +
+           "AND wl.status != 'REJECTED'")
+    List<WorkLog> findActiveLogsForEmployeeOnDate(
+            @Param("employeeId") UUID employeeId,
+            @Param("workDate") LocalDate workDate);
+}

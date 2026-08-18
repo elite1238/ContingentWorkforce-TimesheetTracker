@@ -1,0 +1,134 @@
+{
+  "title": "Choose the visual world for WorkBridge",
+  "question": "The roll assigned Air Operations Control. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Air Operations Control",
+      "kicker": "THE ROLL",
+      "lineage": "airport operations centers and Solari departure boards",
+      "thesis": "The app as a departure board: every assignment, timesheet, and invoice has a status, and status is what you see first.",
+      "palette": ["#0A0E14", "#F5A623", "#F0F2F5", "#22C55E", "#EF4444", "#3B82F6"],
+      "materials": ["OLED dark ground", "Solari amber as sole warm accent", "tabular monospace for all data"],
+      "viewport": "Dark shell. Left nav rail with WorkBridge wordmark. Top strip: four large-type counter units (Contracts · On Assignment · Pending Approvals · Outstanding Invoices). Below: a scrollable status board of active contracts — dense rows, amber status pills in condensed tracked caps, employee count badges, no decorative chrome.",
+      "risk": "Reads generic dark-dashboard if the amber flip-transition on status change is not committed.",
+      "raised": [
+        {"from": "ikeda-datamatics", "raise": "All numbers and IDs in tabular monospace; column alignment as tight as a split-flap flight board."},
+        {"from": "nixie-laboratory-counter", "raise": "Dashboard header counters are large-type display units — not small KPI chips."},
+        {"from": "silk-drawcord-cape", "raise": "One amber accent runs the entire UI; the only warm tone on a cool near-black ground."},
+        {"from": "cloud-quarry", "raise": "Section separators use deep void negative space, not hairline dividers."},
+        {"from": "tdr-info-noise", "raise": "Status pills: condensed tracked uppercase, gridded tight to the edge — no soft rounded badges."}
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          {"label": "nav rail", "x": 0, "y": 0, "w": 2, "h": 10, "accent": true},
+          {"label": "metric counters", "x": 2, "y": 0, "w": 10, "h": 2},
+          {"label": "status board rows", "x": 2, "y": 2, "w": 10, "h": 6},
+          {"label": "pagination / action bar", "x": 2, "y": 8, "w": 10, "h": 2}
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "kicker": "IMPECCABLE'S PICK",
+      "label": "Bloomberg Dark",
+      "lineage": "financial data terminals and professional trading dashboards",
+      "thesis": "Every screen is a data terminal: dense tables, status columns, no chrome that is not data.",
+      "palette": ["#010B13", "#FF6B00", "#00C851", "#FFFFFF", "#1A1A2E"],
+      "materials": ["near-black terminal ground", "amber and green status readout", "monospace data type throughout"],
+      "viewport": "Near-black ground. Top: compact identity bar with active user. Left: narrow nav column. Main: a dense paginated table of the primary entity. Status shown as colored code glyphs, not prose words. No cards, no decoration.",
+      "risk": "This is where most professional dark-dashboard runs land. Familiar and effective — never distinctive."
+    },
+    {
+      "id": "challenger-generative",
+      "label": "Parametric Identity",
+      "verdict": "competitive",
+      "lineage": "generative brand identities and seed-derived design systems",
+      "thesis": "The WorkBridge mark reseeds from live operational data; the palette shifts as the contract portfolio shifts.",
+      "palette": ["#0F172A", "#6366F1", "#F1F5F9", "#10B981"],
+      "materials": ["seed-derived indigo-to-emerald palette", "flat parametric SVG mark", "neutral geometric sans"],
+      "viewport": "Dark-navy shell. Parametric mark top-left redraws on each session. Left nav. Main: tabular list with one accent color that updates when the data seed changes.",
+      "case": "Holds product clarity — parametric data can enhance scanning. Loses narrowly on audience identification for a strictly B2B ops context.",
+      "risk": "Parametric animation adds perceived complexity to an Operate-mode tool.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          {"label": "parametric mark", "x": 0, "y": 0, "w": 2, "h": 2, "accent": true},
+          {"label": "nav", "x": 0, "y": 2, "w": 2, "h": 8},
+          {"label": "seed-derived header strip", "x": 2, "y": 0, "w": 10, "h": 2, "accent": true},
+          {"label": "data table", "x": 2, "y": 2, "w": 10, "h": 8}
+        ]
+      }
+    },
+    {
+      "id": "challenger-ikeda",
+      "label": "Datafield Barcode",
+      "verdict": "declined",
+      "lineage": "Ryoji Ikeda datamatics installations",
+      "palette": ["#000000", "#FFFFFF"],
+      "materials": ["pixel-crisp hairline bars", "monospace numerics", "full-frame inversion on select"],
+      "case": "Binary B/W removes the color-coded status that approval workflows require.",
+      "kept": "Extreme monospace tabular discipline and column-density doctrine."
+    },
+    {
+      "id": "challenger-nixie",
+      "label": "Nixie Counter",
+      "verdict": "declined",
+      "lineage": "nixie tube laboratory counters and instrument panels",
+      "palette": ["#0A0804", "#FF6B35", "#8B7355"],
+      "materials": ["orange plasma digit glow", "blackened steel chassis", "anode mesh gray"],
+      "case": "Nixie form excels at individual metrics but cannot carry the dense list and table operations the product requires.",
+      "kept": "Key metrics as large display-counter units rather than small KPI chips."
+    },
+    {
+      "id": "challenger-tdr",
+      "label": "TDR Info-Noise",
+      "verdict": "declined",
+      "lineage": "The Designers Republic sleeve graphic language",
+      "palette": ["#000000", "#FF00FF", "#FF6600", "#FFFFFF"],
+      "materials": ["flat print surface", "condensed hazard grotesk", "barcode fragment ornament"],
+      "case": "Rave/Wipeout aesthetic does not land on audience identification for B2B ops managers.",
+      "kept": "Condensed tracked-caps status pills gridded tight to edge."
+    },
+    {
+      "id": "challenger-cape",
+      "label": "Drawcord Cape",
+      "verdict": "declined",
+      "lineage": "silk fashion cape with drawcord transformation channels",
+      "palette": ["#0D0D0D", "#C9A84C", "#3D3D3D"],
+      "materials": ["matte black silk", "single gold drawcord accent", "gathered shadow in slate"],
+      "case": "Fashion transformation metaphor has no mapping to timesheet approval or invoice workflows.",
+      "kept": "One gold accent thread against matte dark ground as the only warm color."
+    },
+    {
+      "id": "challenger-cloud",
+      "label": "Cloud Quarry",
+      "verdict": "declined",
+      "lineage": "surreal impossible-world cloud quarry",
+      "palette": ["#E8E8E8", "#87CEEB", "#708090", "#C0C0C0"],
+      "materials": ["cumulus white block mass", "sky-blue cut voids", "thunder gray stock"],
+      "case": "Surreal impossible architecture provides no audience identification or task clarity for B2B operations.",
+      "kept": "Deep void negative space as section separator doctrine."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "code",
+    "toggle": false
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "Clean light sidebar dashboard with blue accent — at full craft.",
+    "palette": ["#FFFFFF", "#1E293B", "#3B82F6", "#F1F5F9"],
+    "materials": ["white ground", "blue accent highlights", "subtle shadow cards"],
+    "viewport": "White shell, sidebar nav with blue active states, summary stat cards, data tables in main area.",
+    "risk": "Indistinguishable from every other B2B SaaS dashboard."
+  },
+  "steer": true
+}
