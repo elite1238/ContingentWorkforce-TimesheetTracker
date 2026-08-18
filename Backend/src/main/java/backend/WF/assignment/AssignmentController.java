@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+
 @RestController
 @RequiredArgsConstructor
 public class AssignmentController {
@@ -63,5 +64,20 @@ public class AssignmentController {
     public ResponseEntity<ApiResponse<List<AssignmentResponse>>> getMyAssignments(
             @RequestParam UUID employeeId) {
         return ResponseEntity.ok(ApiResponse.ok(assignmentService.getMyAssignments(employeeId)));
+    }
+
+    @GetMapping("/api/contracts/{contractId}/suggest-assignments")
+    @PreAuthorize("hasAuthority('CREATE_ASSIGNMENT')")
+    public ResponseEntity<ApiResponse<List<SuggestedAssignmentItem>>> suggestAssignments(
+            @PathVariable UUID contractId) {
+        return ResponseEntity.ok(ApiResponse.ok(assignmentService.suggestAssignments(contractId)));
+    }
+
+    @PostMapping("/api/assignments/bulk")
+    @PreAuthorize("hasAuthority('CREATE_ASSIGNMENT')")
+    public ResponseEntity<ApiResponse<BulkAssignResponse>> bulkCreateAssignments(
+            @Valid @RequestBody BulkAssignRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(assignmentService.bulkCreateAssignments(request)));
     }
 }

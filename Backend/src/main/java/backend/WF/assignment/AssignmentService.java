@@ -4,7 +4,6 @@ import backend.WF.audit.Auditable;
 import backend.WF.assignment.specification.SpecificationChain;
 import backend.WF.common.DateRange;
 import backend.WF.common.TimeWindow;
-import backend.WF.contract.Contract;
 import backend.WF.contract.ContractRequirement;
 import backend.WF.contract.ContractRequirementRepository;
 import backend.WF.employee.Employee;
@@ -13,14 +12,18 @@ import backend.WF.employee.EmployeeResponse;
 import backend.WF.employee.EmployeeService;
 import backend.WF.exception.BusinessRuleViolationException;
 import backend.WF.exception.EntityNotFoundException;
+import backend.WF.skill.EmployeeSkill;
+import backend.WF.skill.EmployeeSkillRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
+import java.time.LocalTime;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,7 @@ public class AssignmentService {
     private final SpecificationChain specificationChain;
     private final EmployeeService employeeService;
     private final EntityManager entityManager;
+    private final EmployeeSkillRepository employeeSkillRepository;
 
     /**
      * THE single method permitted to persist an Assignment.
@@ -152,6 +156,136 @@ public class AssignmentService {
                         emp.getId(), requirementId, dateRange, List.of()))
                 .map(employeeService::toResponse)
                 .toList();
+    }
+
+    /**
+     * Suggest assignments for all unfulfilled slots in a contract.
+     * Read-only — does not persist anything.
+     */
+    @Transactional(readOnly = true)
+    public List<SuggestedAssignmentItem> suggestAssignments(UUID contractId) {
+        List<ContractRequirement> requirements = requirementRepository.findByContractId(contractId);
+        Set<UUID> claimed = new HashSet<>();
+        List<SuggestedAssignmentItem> suggestions = new ArrayList<>();
+
+        for (ContractRequirement req : requirements) {
+            if (req.remainingSlots() <= 0) continue;
+
+            DateRange dateRange = new DateRange(req.getStartDate(), req.getEndDate());
+
+            List<Employee> eligible = employeeRepository.findByActiveTrue().stream()
+                    .filter(emp -> !claimed.contains(emp.getId()))
+                    .filter(emp -> specificationChain.isSatisfied(emp.getId(), req.getId(), dateRange, List.of()))
+                    .collect(Collectors.toList());
+
+            LocalTime defaultStart = LocalTime.of(9, 0);
+            long totalMinutes = req.getExpectedHoursPerDay().multiply(BigDecimal.valueOf(60)).longValue();
+            LocalTime defaultEnd = defaultStart.plusMinutes(totalMinutes);
+
+            for (int slot = 1; slot <= req.remainingSlots(); slot++) {
+                Optional<Employee> best = eligible.stream()
+                        .filter(emp -> !claimed.contains(emp.getId()))
+                        .max(Comparator.comparingDouble(emp -> scoreEmployee(emp.getId(), req)));
+
+                if (best.isEmpty()) {
+                    suggestions.add(SuggestedAssignmentItem.builder()
+                            .requirementId(req.getId())
+                            .skillName(req.getSkill().getName())
+                            .slotIndex(slot)
+                            .status("UNASSIGNABLE")
+                            .startDate(req.getStartDate())
+                            .endDate(req.getEndDate())
+                            .plannedStartTime(defaultStart)
+                            .plannedEndTime(defaultEnd)
+                            .build());
+                } else {
+                    Employee emp = best.get();
+                    claimed.add(emp.getId());
+                    suggestions.add(SuggestedAssignmentItem.builder()
+                            .requirementId(req.getId())
+                            .skillName(req.getSkill().getName())
+                            .slotIndex(slot)
+                            .employeeId(emp.getId())
+                            .employeeName(emp.getFullName())
+                            .score(scoreEmployee(emp.getId(), req))
+                            .status("SUGGESTED")
+                            .startDate(req.getStartDate())
+                            .endDate(req.getEndDate())
+                            .plannedStartTime(defaultStart)
+                            .plannedEndTime(defaultEnd)
+                            .build());
+                }
+            }
+        }
+
+        return suggestions;
+    }
+
+    private double scoreEmployee(UUID employeeId, ContractRequirement req) {
+        int proficiency = employeeSkillRepository
+                .findByEmployeeIdAndSkillId(employeeId, req.getSkill().getId())
+                .map(EmployeeSkill::getProficiencyLevel)
+                .orElse(1);
+        double profScore = (proficiency / 5.0) * 0.6;
+
+        int activeCount = assignmentRepository.findByEmployeeIdAndStatus(employeeId, AssignmentStatus.ACTIVE).size();
+        double loadScore = Math.max(0.0, 1.0 - activeCount / 10.0) * 0.4;
+
+        return profScore + loadScore;
+    }
+
+    /**
+     * Create multiple assignments atomically — all succeed or all roll back.
+     */
+    @Transactional
+    public BulkAssignResponse bulkCreateAssignments(BulkAssignRequest request) {
+        List<AssignmentResponse> results = new ArrayList<>();
+
+        for (BulkAssignItem item : request.getAssignments()) {
+            entityManager.createNativeQuery(
+                            "SELECT 1 FROM employees WHERE id = ?1 FOR UPDATE")
+                    .setParameter(1, item.getEmployeeId())
+                    .getSingleResult();
+
+            ContractRequirement requirement = requirementRepository.findByIdForUpdate(item.getRequirementId())
+                    .orElseThrow(() -> new EntityNotFoundException("ContractRequirement", item.getRequirementId()));
+
+            if (requirement.isFullyFulfilled()) {
+                throw new BusinessRuleViolationException(
+                        "Requirement " + item.getRequirementId() + " is already fully fulfilled ("
+                        + requirement.getFulfilledCount() + "/" + requirement.getRequiredEmployeeCount() + ")");
+            }
+
+            DateRange dateRange = new DateRange(item.getStartDate(), item.getEndDate());
+            TimeWindow timeWindow = new TimeWindow(item.getPlannedStartTime(), item.getPlannedEndTime());
+
+            specificationChain.assertAllSatisfied(
+                    item.getEmployeeId(), item.getRequirementId(), dateRange, List.of(timeWindow));
+
+            Employee employee = employeeRepository.findById(item.getEmployeeId())
+                    .orElseThrow(() -> new EntityNotFoundException("Employee", item.getEmployeeId()));
+
+            Assignment assignment = Assignment.builder()
+                    .employee(employee)
+                    .requirement(requirement)
+                    .startDate(item.getStartDate())
+                    .endDate(item.getEndDate())
+                    .plannedStartTime(item.getPlannedStartTime())
+                    .plannedEndTime(item.getPlannedEndTime())
+                    .status(AssignmentStatus.ACTIVE)
+                    .build();
+            assignment = assignmentRepository.save(assignment);
+
+            requirement.setFulfilledCount(requirement.getFulfilledCount() + 1);
+            requirementRepository.save(requirement);
+
+            results.add(toResponse(assignment));
+        }
+
+        return BulkAssignResponse.builder()
+                .created(results.size())
+                .assignments(results)
+                .build();
     }
 
     public AssignmentResponse toResponse(Assignment a) {

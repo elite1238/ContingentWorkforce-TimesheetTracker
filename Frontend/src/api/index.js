@@ -47,6 +47,10 @@ export const createAssignment = (data) => api.post('/assignments', data)
 export const cancelAssignment = (id) => api.delete(`/assignments/${id}`)
 export const getMyAssignments = (employeeId) =>
   api.get('/assignments/mine', { params: { employeeId } })
+export const suggestAssignments = (contractId) =>
+  api.get(`/contracts/${contractId}/suggest-assignments`)
+export const bulkAssign = (data) =>
+  api.post('/assignments/bulk', data)
 
 // Work Logs
 export const submitWorklog = (data) => api.post('/worklogs', data)
