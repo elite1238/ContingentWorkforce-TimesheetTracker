@@ -20,6 +20,7 @@ venv/
 dist
 dist-ssr
 build
+target/
 *.local
 
 # IDE
@@ -30,6 +31,29 @@ build
 *.swp
 *.swo
 *~
+*.iws
+*.iml
+*.ipr
+
+# Spring Boot / STS
+HELP.md
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
 
 # OS
 .DS_Store
