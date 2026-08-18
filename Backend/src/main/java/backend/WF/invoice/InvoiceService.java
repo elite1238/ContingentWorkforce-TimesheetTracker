@@ -5,6 +5,7 @@ import backend.WF.billing.BillingStrategyRegistry;
 import backend.WF.billing.InvoiceCalculationStrategy;
 import backend.WF.contract.Contract;
 import backend.WF.contract.ContractRepository;
+import backend.WF.email.EmailService;
 import backend.WF.exception.BusinessRuleViolationException;
 import backend.WF.exception.EntityNotFoundException;
 import backend.WF.milestone.ContractMilestone;
@@ -13,6 +14,7 @@ import backend.WF.security.User;
 import backend.WF.worklog.WorkLog;
 import backend.WF.worklog.WorkLogRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
@@ -31,6 +34,8 @@ public class InvoiceService {
     private final WorkLogRepository workLogRepository;
     private final BillingStrategyRegistry billingStrategyRegistry;
     private final CurrentUserService currentUserService;
+    private final InvoiceReportService invoiceReportService;
+    private final EmailService emailService;
 
     @Transactional
     @Auditable(action = "GENERATE_INVOICE", entityType = "Invoice")
@@ -125,7 +130,41 @@ public class InvoiceService {
 
         invoice.setStatus(InvoiceStatus.APPROVED);
         invoice.setApprovedAt(LocalDateTime.now());
-        return toResponse(invoiceRepository.save(invoice));
+        Invoice saved = invoiceRepository.save(invoice);
+
+        String companyEmail = saved.getContract().getCompany().getContactEmail();
+        if (companyEmail != null && !companyEmail.isBlank()) {
+            try {
+                byte[] pdf = invoiceReportService.generateReport(saved.getId());
+                String subject = "Invoice Approved – " + saved.getContract().getTitle();
+                String html = buildInvoiceEmailHtml(saved);
+                String filename = "invoice-" + saved.getId() + ".pdf";
+                emailService.sendInvoiceEmail(companyEmail, subject, html, pdf, filename);
+            } catch (Exception e) {
+                log.error("Invoice approved but email failed for invoice {}: {}", saved.getId(), e.getMessage());
+            }
+        } else {
+            log.warn("Invoice {} approved but company has no contactEmail — skipping email", saved.getId());
+        }
+
+        return toResponse(saved);
+    }
+
+    private String buildInvoiceEmailHtml(Invoice invoice) {
+        return """
+                <p>Dear Team,</p>
+                <p>Invoice for contract <strong>%s</strong> covering <strong>%s to %s</strong>
+                has been approved.</p>
+                <p>Total Amount: <strong>₹ %s</strong></p>
+                <p>Please find the detailed invoice report attached.</p>
+                <br/>
+                <p>Regards,<br/>Workforce Management System</p>
+                """.formatted(
+                invoice.getContract().getTitle(),
+                invoice.getPeriodStart(),
+                invoice.getPeriodEnd(),
+                invoice.getTotalAmount().toPlainString()
+        );
     }
 
     @Transactional(readOnly = true)
