@@ -1,10 +1,20 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 
-export function ProtectedRoute({ children, role }) {
-  const { user, isManager, isEmployee } = useAuth()
+export function ProtectedRoute({ children, roles, permission }) {
+  const { user, defaultRoute, hasAnyRole, hasPermission } = useAuth()
   if (!user) return <Navigate to="/login" replace />
-  if (role === 'MANAGER' && !isManager) return <Navigate to="/my-assignments" replace />
-  if (role === 'EMPLOYEE' && !isEmployee) return <Navigate to="/dashboard" replace />
+  if (roles && roles.length > 0 && !hasAnyRole(...roles)) {
+    return <Navigate to={defaultRoute} replace />
+  }
+  if (permission && !hasPermission(permission)) {
+    return <Navigate to={defaultRoute} replace />
+  }
   return children
+}
+
+export function RoleLanding() {
+  const { user, defaultRoute } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  return <Navigate to={defaultRoute} replace />
 }

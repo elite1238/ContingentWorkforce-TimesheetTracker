@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   getContract, getRequirements, getEligibleEmployees,
-  getAssignmentsByRequirement, createAssignment, cancelAssignment,
-  generateInvoice, getInvoicesByContract, approveInvoice,
+  getAssignmentsByRequirement, getAssignmentsByContract,
+  createAssignment, cancelAssignment,
   getSkills, createRequirement,
+  getMilestonesByContract, createMilestone, markMilestoneReached,
 } from '../../api'
 import { useFetch } from '../../hooks/useFetch'
 import PageHeader from '../../components/PageHeader'
 import Drawer from '../../components/Drawer'
 import Btn from '../../components/Btn'
 import StatusPill from '../../components/StatusPill'
+import Calendar from '../../components/Calendar'
 
 const ERR = {
   padding: '10px 16px', background: '#ef444415', color: '#ef4444',
@@ -34,40 +36,64 @@ const SEC_HEAD = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
 }
 
+const EMPTY_REQ = {
+  skillId: '', requiredEmployeeCount: 1, hourlyRate: '', expectedHoursPerDay: '',
+  minProficiency: 1, startDate: '', endDate: '',
+}
+const EMPTY_MILESTONE = { sequenceOrder: 1, label: '', thresholdPercent: '', amount: '' }
+
 export default function ContractDetail() {
   const { id } = useParams()
 
-  const contract     = useFetch(() => getContract(id), [id])
-  const requirements = useFetch(() => getRequirements(id), [id])
-  const invoices     = useFetch(() => getInvoicesByContract(id), [id])
-  const skills       = useFetch(getSkills, [])
+  const contract         = useFetch(() => getContract(id), [id])
+  const requirements     = useFetch(() => getRequirements(id), [id])
+  const skills           = useFetch(getSkills, [])
+  const milestones       = useFetch(() => getMilestonesByContract(id), [id])
+  const assignmentsAll   = useFetch(() => getAssignmentsByContract(id), [id])
 
-  // Add requirement drawer state
-  const EMPTY_REQ = { skillId: '', requiredEmployeeCount: 1, hourlyRate: '', expectedHoursPerDay: '', startDate: '', endDate: '' }
+  // Add-requirement drawer
   const [reqDrawer, setReqDrawer]   = useState(false)
   const [reqForm, setReqForm]       = useState(EMPTY_REQ)
   const [reqError, setReqError]     = useState(null)
   const [reqSaving, setReqSaving]   = useState(false)
 
-  // Assign drawer state
+  // Assign drawer
   const [assignReq, setAssignReq]         = useState(null)
   const [eligibles, setEligibles]         = useState([])
   const [eligLoading, setEligLoading]     = useState(false)
-  const [assignForm, setAssignForm]       = useState({ employeeId: '', plannedStartTime: '', plannedEndTime: '' })
+  const [assignForm, setAssignForm]       = useState({ employeeId: '', plannedStartTime: '09:00', plannedEndTime: '17:00' })
   const [assignError, setAssignError]     = useState(null)
   const [assigning, setAssigning]         = useState(false)
 
-  // Invoice drawer
-  const [invDrawer, setInvDrawer]         = useState(false)
-  const [invForm, setInvForm]             = useState({ periodStart: '', periodEnd: '' })
-  const [invError, setInvError]           = useState(null)
-  const [invSaving, setInvSaving]         = useState(false)
+  // Add-milestone drawer
+  const [msDrawer, setMsDrawer]     = useState(false)
+  const [msForm, setMsForm]         = useState(EMPTY_MILESTONE)
+  const [msError, setMsError]       = useState(null)
+  const [msSaving, setMsSaving]     = useState(false)
 
   const [actionError, setActionError]     = useState(null)
 
-  const c    = contract.data
-  const reqs = requirements.data ?? []
-  const invList = invoices.data ?? []
+  const c        = contract.data
+  const reqs     = requirements.data ?? []
+  const msList   = milestones.data ?? []
+  const asgAll   = assignmentsAll.data ?? []
+  const isMilestone = c?.billingTypeCode === 'MILESTONE'
+
+  const calendarEvents = useMemo(() => (
+    asgAll
+      .filter(a => a.status === 'ACTIVE')
+      .map(a => {
+        const start = `${a.startDate}T${a.plannedStartTime}`
+        const end   = `${a.endDate}T${a.plannedEndTime}`
+        return {
+          id: a.id,
+          title: `${a.employeeName} · ${a.skillName}`,
+          start,
+          end,
+          extendedProps: { assignment: a },
+        }
+      })
+  ), [asgAll])
 
   async function handleAddRequirement(e) {
     e.preventDefault()
@@ -79,6 +105,7 @@ export default function ContractDetail() {
         requiredEmployeeCount: parseInt(reqForm.requiredEmployeeCount, 10),
         hourlyRate: parseFloat(reqForm.hourlyRate),
         expectedHoursPerDay: parseFloat(reqForm.expectedHoursPerDay),
+        minProficiency: parseInt(reqForm.minProficiency, 10),
         startDate: reqForm.startDate,
         endDate: reqForm.endDate,
       })
@@ -93,7 +120,7 @@ export default function ContractDetail() {
 
   async function openAssignDrawer(req) {
     setAssignReq(req)
-    setAssignForm({ employeeId: '', plannedStartTime: '', plannedEndTime: '' })
+    setAssignForm({ employeeId: '', plannedStartTime: '09:00', plannedEndTime: '17:00' })
     setAssignError(null)
     setEligLoading(true)
     setEligibles([])
@@ -123,6 +150,7 @@ export default function ContractDetail() {
       })
       setAssignReq(null)
       requirements.reload()
+      assignmentsAll.reload()
     } catch (err) {
       setAssignError(err?.response?.data?.message ?? err?.message ?? 'Assignment failed')
     } finally {
@@ -135,32 +163,39 @@ export default function ContractDetail() {
     try {
       await cancelAssignment(asgId)
       requirements.reload()
+      assignmentsAll.reload()
     } catch (err) {
       setActionError(err?.response?.data?.message ?? err?.message ?? 'Cancel failed')
     }
   }
 
-  async function handleInvoice(e) {
+  async function handleAddMilestone(e) {
     e.preventDefault()
-    setInvSaving(true)
-    setInvError(null)
+    setMsSaving(true)
+    setMsError(null)
     try {
-      await generateInvoice({ contractId: id, periodStart: invForm.periodStart, periodEnd: invForm.periodEnd })
-      setInvDrawer(false)
-      invoices.reload()
+      await createMilestone(id, {
+        sequenceOrder: parseInt(msForm.sequenceOrder, 10),
+        label: msForm.label,
+        thresholdPercent: msForm.thresholdPercent === '' ? null : parseFloat(msForm.thresholdPercent),
+        amount: parseFloat(msForm.amount),
+      })
+      setMsDrawer(false)
+      milestones.reload()
     } catch (err) {
-      setInvError(err?.response?.data?.message ?? err?.message ?? 'Invoice generation failed')
+      setMsError(err?.response?.data?.message ?? err?.message ?? 'Failed to add milestone')
     } finally {
-      setInvSaving(false)
+      setMsSaving(false)
     }
   }
 
-  async function handleApproveInvoice(invId) {
+  async function handleMarkReached(msId) {
+    setActionError(null)
     try {
-      await approveInvoice(invId)
-      invoices.reload()
+      await markMilestoneReached(msId)
+      milestones.reload()
     } catch (err) {
-      setActionError(err?.response?.data?.message ?? err?.message ?? 'Approve failed')
+      setActionError(err?.response?.data?.message ?? err?.message ?? 'Mark failed')
     }
   }
 
@@ -173,15 +208,15 @@ export default function ContractDetail() {
 
   return (
     <div>
-      <PageHeader title={c?.title ?? 'Contract'} subtitle={`ID: ${id}`} />
+      <PageHeader title={c?.title ?? 'Contract'} subtitle={`${c?.companyName ?? ''} · ${c?.billingTypeLabel ?? c?.billingTypeCode ?? ''}`} />
       <div style={{ padding: '24px 32px' }}>
         {actionError && <div style={ERR}>ERROR: {actionError}</div>}
 
-        {/* Contract info card */}
+        {/* Contract info */}
         <div style={{ ...SECTION, marginBottom: 28, padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
           {[
-            ['Client',       c?.companyName ?? c?.companyId ?? '—'],
-            ['Billing Type', c?.billingType],
+            ['Client',       c?.companyName ?? '—'],
+            ['Billing Type', c?.billingTypeLabel ?? c?.billingTypeCode ?? '—'],
             ['Start Date',   c?.startDate],
             ['End Date',     c?.endDate],
           ].map(([lbl, val]) => (
@@ -211,10 +246,12 @@ export default function ContractDetail() {
               <thead>
                 <tr>
                   <th>Skill</th>
+                  <th>Min Prof.</th>
                   <th>Required</th>
                   <th>Fulfilled</th>
                   <th>Remaining</th>
                   <th>Hourly Rate</th>
+                  <th>Hrs/Day</th>
                   <th>Start</th>
                   <th>End</th>
                   <th>Actions</th>
@@ -234,54 +271,100 @@ export default function ContractDetail() {
           )}
         </div>
 
-        {/* Invoices */}
+        {/* Assignment calendar */}
         <div style={SECTION}>
           <div style={SEC_HEAD}>
-            <span>INVOICES</span>
-            <Btn small onClick={() => { setInvForm({ periodStart: '', periodEnd: '' }); setInvError(null); setInvDrawer(true) }}>
-              + GENERATE INVOICE
-            </Btn>
+            <span>ASSIGNMENT CALENDAR</span>
+            <span style={{ color: '#7a9ab0', fontSize: 10 }}>
+              {asgAll.filter(a => a.status === 'ACTIVE').length} active
+            </span>
           </div>
-          {invoices.loading ? (
-            <div style={{ padding: 16, color: '#7a9ab0', fontFamily: 'monospace', fontSize: 12 }}>Loading...</div>
-          ) : invList.length === 0 ? (
-            <div style={{ padding: 16, color: '#7a9ab0', fontFamily: 'monospace', fontSize: 12 }}>No invoices yet</div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Period Start</th>
-                  <th>Period End</th>
-                  <th>Status</th>
-                  <th>Total Amount</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invList.map(inv => (
-                  <tr key={inv.id}>
-                    <td>{inv.periodStart}</td>
-                    <td>{inv.periodEnd}</td>
-                    <td><StatusPill value={inv.status} /></td>
-                    <td style={{ color: '#ff6b00' }}>{inv.totalAmount != null ? `$${inv.totalAmount.toFixed(2)}` : '—'}</td>
-                    <td>
-                      {inv.status === 'PENDING_APPROVAL' && (
-                        <Btn small variant="approve" onClick={() => handleApproveInvoice(inv.id)}>APPROVE</Btn>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <div style={{ padding: 16 }}>
+            {assignmentsAll.loading ? (
+              <div style={{ color: '#7a9ab0', fontFamily: 'monospace', fontSize: 12 }}>Loading...</div>
+            ) : (
+              <Calendar
+                events={calendarEvents}
+                view="timeGridWeek"
+                onEventClick={(info) => {
+                  const asg = info.event.extendedProps.assignment
+                  if (confirm(`Cancel assignment for ${asg.employeeName} on ${asg.startDate}?`)) {
+                    handleCancelAssignment(asg.id)
+                  }
+                }}
+                height={520}
+              />
+            )}
+          </div>
         </div>
+
+        {/* Milestones — only for MILESTONE contracts */}
+        {isMilestone && (
+          <div style={SECTION}>
+            <div style={SEC_HEAD}>
+              <span>MILESTONES</span>
+              <Btn small onClick={() => {
+                const nextSeq = (msList[msList.length - 1]?.sequenceOrder ?? 0) + 1
+                setMsForm({ ...EMPTY_MILESTONE, sequenceOrder: nextSeq })
+                setMsError(null)
+                setMsDrawer(true)
+              }}>+ ADD MILESTONE</Btn>
+            </div>
+            {milestones.loading ? (
+              <div style={{ padding: 16, color: '#7a9ab0', fontFamily: 'monospace', fontSize: 12 }}>Loading...</div>
+            ) : msList.length === 0 ? (
+              <div style={{ padding: 16, color: '#7a9ab0', fontFamily: 'monospace', fontSize: 12 }}>No milestones defined</div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Label</th>
+                    <th>Threshold %</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Marked At</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {msList.map(m => (
+                    <tr key={m.id}>
+                      <td style={{ color: '#7a9ab0' }}>{m.sequenceOrder}</td>
+                      <td style={{ color: '#f0f2f5', fontWeight: 600 }}>{m.label}</td>
+                      <td>{m.thresholdPercent != null ? `${m.thresholdPercent}%` : '—'}</td>
+                      <td style={{ color: '#ff6b00', fontWeight: 700 }}>${Number(m.amount).toFixed(2)}</td>
+                      <td><StatusPill value={m.status} /></td>
+                      <td>{m.markedAt?.replace('T', ' ').slice(0, 16) ?? '—'}</td>
+                      <td>
+                        {m.status === 'PENDING' && (
+                          <Btn small variant="approve" onClick={() => handleMarkReached(m.id)}>MARK REACHED</Btn>
+                        )}
+                        {m.status === 'REACHED' && (
+                          <span style={{ color: '#fab43c', fontFamily: 'monospace', fontSize: 11 }}>
+                            AWAITING FINANCE
+                          </span>
+                        )}
+                        {m.status === 'APPROVED_INVOICED' && (
+                          <span style={{ color: '#00c851', fontFamily: 'monospace', fontSize: 11 }}>
+                            INVOICED
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Assign Employee Drawer */}
       <Drawer open={!!assignReq} onClose={() => setAssignReq(null)} title="ASSIGN EMPLOYEE" width={540}>
         {assignError && <div style={ERR}>ERROR: {assignError}</div>}
         <div style={{ marginBottom: 16, color: '#7a9ab0', fontFamily: 'monospace', fontSize: 11 }}>
-          Requirement: {assignReq?.skillName ?? assignReq?.id}
+          Requirement: {assignReq?.skillName} · min proficiency {assignReq?.minProficiency ?? 1}
         </div>
         {eligLoading ? (
           <div style={{ color: '#7a9ab0', fontFamily: 'monospace', fontSize: 12, marginBottom: 16 }}>Loading eligible employees...</div>
@@ -327,12 +410,12 @@ export default function ContractDetail() {
             <div>
               <label style={LABEL}>Planned Start Time</label>
               <input type="time" value={assignForm.plannedStartTime}
-                onChange={e => setAssignForm(f => ({ ...f, plannedStartTime: e.target.value }))} />
+                onChange={e => setAssignForm(f => ({ ...f, plannedStartTime: e.target.value }))} required />
             </div>
             <div>
               <label style={LABEL}>Planned End Time</label>
               <input type="time" value={assignForm.plannedEndTime}
-                onChange={e => setAssignForm(f => ({ ...f, plannedEndTime: e.target.value }))} />
+                onChange={e => setAssignForm(f => ({ ...f, plannedEndTime: e.target.value }))} required />
             </div>
           </div>
           <Btn type="submit" disabled={assigning || !assignForm.employeeId}>
@@ -354,10 +437,17 @@ export default function ContractDetail() {
               ))}
             </select>
           </div>
-          <div style={FIELD}>
-            <label style={LABEL}>Required Employee Count</label>
-            <input type="number" min="1" value={reqForm.requiredEmployeeCount}
-              onChange={e => setReqForm(f => ({ ...f, requiredEmployeeCount: e.target.value }))} required />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+            <div>
+              <label style={LABEL}>Required Count</label>
+              <input type="number" min="1" value={reqForm.requiredEmployeeCount}
+                onChange={e => setReqForm(f => ({ ...f, requiredEmployeeCount: e.target.value }))} required />
+            </div>
+            <div>
+              <label style={LABEL}>Min Proficiency (1-5)</label>
+              <input type="number" min="1" max="5" value={reqForm.minProficiency}
+                onChange={e => setReqForm(f => ({ ...f, minProficiency: e.target.value }))} required />
+            </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
             <div>
@@ -389,22 +479,37 @@ export default function ContractDetail() {
         </form>
       </Drawer>
 
-      {/* Generate Invoice Drawer */}
-      <Drawer open={invDrawer} onClose={() => setInvDrawer(false)} title="GENERATE INVOICE">
-        {invError && <div style={ERR}>ERROR: {invError}</div>}
-        <form onSubmit={handleInvoice}>
-          <div style={FIELD}>
-            <label style={LABEL}>Period Start</label>
-            <input type="date" value={invForm.periodStart}
-              onChange={e => setInvForm(f => ({ ...f, periodStart: e.target.value }))} required />
+      {/* Add Milestone Drawer */}
+      <Drawer open={msDrawer} onClose={() => setMsDrawer(false)} title="ADD MILESTONE">
+        {msError && <div style={ERR}>ERROR: {msError}</div>}
+        <form onSubmit={handleAddMilestone}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 18 }}>
+            <div>
+              <label style={LABEL}>Sequence #</label>
+              <input type="number" min="1" value={msForm.sequenceOrder}
+                onChange={e => setMsForm(f => ({ ...f, sequenceOrder: e.target.value }))} required />
+            </div>
+            <div>
+              <label style={LABEL}>Label</label>
+              <input value={msForm.label}
+                onChange={e => setMsForm(f => ({ ...f, label: e.target.value }))} required
+                placeholder="e.g. 25% MVP delivery" />
+            </div>
           </div>
-          <div style={FIELD}>
-            <label style={LABEL}>Period End</label>
-            <input type="date" value={invForm.periodEnd}
-              onChange={e => setInvForm(f => ({ ...f, periodEnd: e.target.value }))} required />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+            <div>
+              <label style={LABEL}>Threshold % (optional)</label>
+              <input type="number" min="0" max="100" step="0.01" value={msForm.thresholdPercent}
+                onChange={e => setMsForm(f => ({ ...f, thresholdPercent: e.target.value }))} />
+            </div>
+            <div>
+              <label style={LABEL}>Amount ($)</label>
+              <input type="number" min="0.01" step="0.01" value={msForm.amount}
+                onChange={e => setMsForm(f => ({ ...f, amount: e.target.value }))} required />
+            </div>
           </div>
-          <Btn type="submit" disabled={invSaving}>
-            {invSaving ? 'GENERATING...' : 'GENERATE INVOICE'}
+          <Btn type="submit" disabled={msSaving}>
+            {msSaving ? 'SAVING...' : 'ADD MILESTONE'}
           </Btn>
         </form>
       </Drawer>
@@ -416,17 +521,20 @@ function RequirementRow({ req, onAssign, onCancel }) {
   const assignments = useFetch(() => getAssignmentsByRequirement(req.id), [req.id])
   const asgList = assignments.data ?? []
   const [expanded, setExpanded] = useState(false)
+  const activeCount = asgList.filter(a => a.status !== 'CANCELLED').length
 
   return (
     <>
       <tr>
-        <td style={{ color: '#f0f2f5' }}>{req.skillName ?? req.skill?.name ?? '—'}</td>
-        <td>{req.requiredCount ?? 1}</td>
-        <td style={{ color: '#00c851' }}>{asgList.filter(a => a.status !== 'CANCELLED').length}</td>
+        <td style={{ color: '#f0f2f5' }}>{req.skillName ?? '—'}</td>
+        <td style={{ color: '#ff6b00' }}>≥ {req.minProficiency ?? 1}</td>
+        <td>{req.requiredEmployeeCount ?? 1}</td>
+        <td style={{ color: '#00c851' }}>{activeCount}</td>
         <td style={{ color: '#ff6b00' }}>
-          {Math.max(0, (req.requiredCount ?? 1) - asgList.filter(a => a.status !== 'CANCELLED').length)}
+          {Math.max(0, (req.requiredEmployeeCount ?? 1) - activeCount)}
         </td>
         <td>{req.hourlyRate != null ? `$${req.hourlyRate}` : '—'}</td>
+        <td>{req.expectedHoursPerDay ?? '—'}</td>
         <td>{req.startDate}</td>
         <td>{req.endDate}</td>
         <td style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -438,8 +546,8 @@ function RequirementRow({ req, onAssign, onCancel }) {
       </tr>
       {expanded && asgList.map(a => (
         <tr key={a.id} style={{ background: '#08131c' }}>
-          <td colSpan={6} style={{ paddingLeft: 32, color: '#7a9ab0', fontSize: 11 }}>
-            {a.employeeName ?? a.employeeId} · {a.startDate} → {a.endDate}
+          <td colSpan={8} style={{ paddingLeft: 32, color: '#7a9ab0', fontSize: 11 }}>
+            {a.employeeName ?? a.employeeId} · {a.startDate} → {a.endDate} · {a.plannedStartTime}–{a.plannedEndTime}
           </td>
           <td><StatusPill value={a.status} /></td>
           <td>

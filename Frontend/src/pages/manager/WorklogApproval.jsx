@@ -1,14 +1,20 @@
-import { useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { getPendingWorklogs, approveWorklog } from '../../api'
 import { useFetch } from '../../hooks/useFetch'
 import PageHeader from '../../components/PageHeader'
 import Btn from '../../components/Btn'
 import StatusPill from '../../components/StatusPill'
+import Calendar from '../../components/Calendar'
 
 const ERR = {
   padding: '10px 16px', background: '#ef444415', color: '#ef4444',
   borderLeft: '2px solid #ef4444', marginBottom: 16,
   fontFamily: 'monospace', fontSize: 12,
+}
+const LABEL = {
+  display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+  color: '#7a9ab0', fontFamily: 'ui-monospace, Consolas, monospace',
+  marginBottom: 6, textTransform: 'uppercase',
 }
 
 function toDateStr(d) { return d.toISOString().slice(0, 10) }
@@ -27,8 +33,9 @@ function totalHours(segments) {
 export default function WorklogApproval() {
   const [from, setFrom]           = useState(toDateStr(daysAgo(7)))
   const [to, setTo]               = useState(toDateStr(new Date()))
+  const [view, setView]           = useState('calendar')
   const [expanded, setExpanded]   = useState({})
-  const [rejecting, setRejecting] = useState({})   // id → reason string
+  const [rejecting, setRejecting] = useState({})
   const [actionError, setActionError] = useState(null)
   const [acting, setActing]       = useState(null)
 
@@ -39,13 +46,21 @@ export default function WorklogApproval() {
 
   const submitted = (data ?? []).filter(w => w.status === 'SUBMITTED')
 
-  function toggleExpand(id) {
-    setExpanded(x => ({ ...x, [id]: !x[id] }))
-  }
+  const events = useMemo(() => (
+    submitted.flatMap(w =>
+      (w.segments ?? []).map((seg, i) => ({
+        id: `${w.id}-${i}`,
+        title: `${w.employeeName ?? 'Employee'}`,
+        start: `${w.workDate}T${seg.startTime}`,
+        end:   `${w.workDate}T${seg.endTime}`,
+        classNames: ['wb-submitted'],
+        extendedProps: { worklog: w },
+      })),
+    )
+  ), [submitted])
 
-  function startReject(id) {
-    setRejecting(r => ({ ...r, [id]: '' }))
-  }
+  function toggleExpand(id) { setExpanded(x => ({ ...x, [id]: !x[id] })) }
+  function startReject(id) { setRejecting(r => ({ ...r, [id]: '' })) }
 
   async function handleAction(id, approved, reason) {
     setActing(id)
@@ -61,6 +76,16 @@ export default function WorklogApproval() {
     }
   }
 
+  function onEventClick(info) {
+    const w = info.event.extendedProps.worklog
+    if (confirm(`Approve worklog for ${w.employeeName} on ${w.workDate}?\n\nCancel to reject.`)) {
+      handleAction(w.id, true, null)
+    } else {
+      const reason = prompt('Rejection reason:')
+      if (reason && reason.trim()) handleAction(w.id, false, reason.trim())
+    }
+  }
+
   return (
     <div>
       <PageHeader title="Worklog Approvals" subtitle="Review submitted timesheets" />
@@ -69,30 +94,23 @@ export default function WorklogApproval() {
           <div style={ERR}>ERROR: {error || actionError}</div>
         )}
 
-        {/* Date range controls */}
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', marginBottom: 24, flexWrap: 'wrap' }}>
           <div>
-            <label style={{
-              display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-              color: '#7a9ab0', fontFamily: 'ui-monospace, Consolas, monospace',
-              marginBottom: 6, textTransform: 'uppercase',
-            }}>From</label>
-            <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-              style={{ width: 160 }} />
+            <label style={LABEL}>From</label>
+            <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={{ width: 160 }} />
           </div>
           <div>
-            <label style={{
-              display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-              color: '#7a9ab0', fontFamily: 'ui-monospace, Consolas, monospace',
-              marginBottom: 6, textTransform: 'uppercase',
-            }}>To</label>
-            <input type="date" value={to} onChange={e => setTo(e.target.value)}
-              style={{ width: 160 }} />
+            <label style={LABEL}>To</label>
+            <input type="date" value={to} onChange={e => setTo(e.target.value)} style={{ width: 160 }} />
           </div>
           <Btn variant="ghost" onClick={reload}>REFRESH</Btn>
           <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#7a9ab0', alignSelf: 'center' }}>
             {loading ? '...' : `${submitted.length} pending`}
           </span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <Btn small variant={view === 'calendar' ? 'primary' : 'ghost'} onClick={() => setView('calendar')}>CALENDAR</Btn>
+            <Btn small variant={view === 'list' ? 'primary' : 'ghost'} onClick={() => setView('list')}>LIST</Btn>
+          </div>
         </div>
 
         {loading ? (
@@ -101,6 +119,13 @@ export default function WorklogApproval() {
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#7a9ab0', fontFamily: 'monospace', fontSize: 13 }}>
             No pending worklogs in this date range
           </div>
+        ) : view === 'calendar' ? (
+          <Calendar
+            events={events}
+            view="timeGridWeek"
+            onEventClick={onEventClick}
+            height={640}
+          />
         ) : (
           <table>
             <thead>
@@ -115,12 +140,12 @@ export default function WorklogApproval() {
             </thead>
             <tbody>
               {submitted.map(w => (
-                <>
-                  <tr key={w.id}>
+                <Fragment key={w.id}>
+                  <tr>
                     <td style={{ color: '#f0f2f5' }}>{w.employeeName ?? w.employeeId ?? '—'}</td>
                     <td>{w.workDate}</td>
                     <td style={{ color: '#ff6b00', fontWeight: 700 }}>
-                      {w.totalHours ?? totalHours(w.segments)}h
+                      {(w.totalActualMinutes / 60).toFixed(2) || totalHours(w.segments)}h
                     </td>
                     <td><StatusPill value={w.status} /></td>
                     <td>
@@ -135,12 +160,8 @@ export default function WorklogApproval() {
                         {rejecting[w.id] === undefined ? (
                           <>
                             <Btn small variant="approve" disabled={acting === w.id}
-                              onClick={() => handleAction(w.id, true, null)}>
-                              APPROVE
-                            </Btn>
-                            <Btn small variant="reject" onClick={() => startReject(w.id)}>
-                              REJECT
-                            </Btn>
+                              onClick={() => handleAction(w.id, true, null)}>APPROVE</Btn>
+                            <Btn small variant="reject" onClick={() => startReject(w.id)}>REJECT</Btn>
                           </>
                         ) : (
                           <>
@@ -151,13 +172,9 @@ export default function WorklogApproval() {
                               style={{ width: 180, fontSize: 11 }}
                             />
                             <Btn small variant="reject" disabled={acting === w.id || !rejecting[w.id]}
-                              onClick={() => handleAction(w.id, false, rejecting[w.id])}>
-                              CONFIRM
-                            </Btn>
+                              onClick={() => handleAction(w.id, false, rejecting[w.id])}>CONFIRM</Btn>
                             <Btn small variant="ghost"
-                              onClick={() => setRejecting(r => { const n = { ...r }; delete n[w.id]; return n })}>
-                              CANCEL
-                            </Btn>
+                              onClick={() => setRejecting(r => { const n = { ...r }; delete n[w.id]; return n })}>CANCEL</Btn>
                           </>
                         )}
                       </div>
@@ -165,15 +182,11 @@ export default function WorklogApproval() {
                   </tr>
                   {expanded[w.id] && w.segments?.map((seg, i) => (
                     <tr key={`${w.id}-seg-${i}`} style={{ background: '#08131c' }}>
-                      <td colSpan={2} style={{ paddingLeft: 32, color: '#7a9ab0', fontSize: 11 }}>
-                        Segment {i + 1}
-                      </td>
-                      <td colSpan={4} style={{ color: '#7a9ab0', fontSize: 11 }}>
-                        {seg.startTime} → {seg.endTime}
-                      </td>
+                      <td colSpan={2} style={{ paddingLeft: 32, color: '#7a9ab0', fontSize: 11 }}>Segment {i + 1}</td>
+                      <td colSpan={4} style={{ color: '#7a9ab0', fontSize: 11 }}>{seg.startTime} → {seg.endTime}</td>
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

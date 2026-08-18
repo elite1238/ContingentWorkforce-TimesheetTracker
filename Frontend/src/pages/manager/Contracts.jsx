@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getContracts, getCompanies, createContract } from '../../api'
+import { getContracts, getCompanies, createContract, getBillingTypes } from '../../api'
 import { useFetch } from '../../hooks/useFetch'
 import PageHeader from '../../components/PageHeader'
 import Drawer from '../../components/Drawer'
@@ -18,12 +18,13 @@ const LABEL = {
   marginBottom: 6, textTransform: 'uppercase',
 }
 const FIELD = { marginBottom: 18 }
-const EMPTY = { title: '', description: '', companyId: '', billingType: 'HOURLY', startDate: '', endDate: '' }
+const EMPTY = { title: '', description: '', companyId: '', billingTypeId: '', startDate: '', endDate: '' }
 
 export default function Contracts() {
   const navigate = useNavigate()
   const contracts = useFetch(getContracts, [])
   const companies = useFetch(getCompanies, [])
+  const billingTypes = useFetch(getBillingTypes, [])
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [form, setForm]             = useState(EMPTY)
@@ -32,13 +33,15 @@ export default function Contracts() {
 
   const contractList = contracts.data ?? []
   const companyList  = companies.data  ?? []
+  const btList       = billingTypes.data ?? []
 
   function set(field) {
     return e => setForm(f => ({ ...f, [field]: e.target.value }))
   }
 
   function openCreate() {
-    setForm(EMPTY)
+    const defaultBt = btList.find(bt => bt.code === 'HOURLY')?.id ?? ''
+    setForm({ ...EMPTY, billingTypeId: defaultBt })
     setActionError(null)
     setDrawerOpen(true)
   }
@@ -101,10 +104,10 @@ export default function Contracts() {
                 >
                   <td style={{ color: '#f0f2f5', fontWeight: 600 }}>{c.title}</td>
                   <td>{companyName(c.companyId)}</td>
-                  <td><StatusPill value={c.billingType} /></td>
+                  <td><StatusPill value={c.billingTypeCode ?? c.billingTypeLabel ?? '—'} /></td>
                   <td>{c.startDate}</td>
                   <td>{c.endDate}</td>
-                  <td><StatusPill value={c.status ?? 'ACTIVE'} /></td>
+                  <td><StatusPill value={c.active ? 'ACTIVE' : 'INACTIVE'} /></td>
                   <td onClick={e => e.stopPropagation()}>
                     <Btn small variant="ghost" onClick={() => navigate(`/contracts/${c.id}`)}>VIEW</Btn>
                   </td>
@@ -142,9 +145,11 @@ export default function Contracts() {
           </div>
           <div style={FIELD}>
             <label style={LABEL}>Billing Type</label>
-            <select value={form.billingType} onChange={set('billingType')}>
-              <option value="HOURLY">HOURLY</option>
-              <option value="MILESTONE">MILESTONE</option>
+            <select value={form.billingTypeId} onChange={set('billingTypeId')} required>
+              <option value="">— Select billing type —</option>
+              {btList.map(bt => (
+                <option key={bt.id} value={bt.id}>{bt.label} ({bt.code})</option>
+              ))}
             </select>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
@@ -159,7 +164,7 @@ export default function Contracts() {
           </div>
           <div style={{ marginBottom: 8, padding: '10px 12px', background: '#ff6b0008', border: '1px solid #ff6b0025', borderRadius: 3 }}>
             <span style={{ fontSize: 11, color: '#7a9ab0', fontFamily: 'monospace' }}>
-              Requirements and assignments are managed from the contract detail page.
+              Requirements, milestones, and assignments are managed from the contract detail page.
             </span>
           </div>
           <Btn type="submit" disabled={saving}>

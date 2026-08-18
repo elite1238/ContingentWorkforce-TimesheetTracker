@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { getMyAssignments } from '../../api'
@@ -5,6 +6,7 @@ import { useFetch } from '../../hooks/useFetch'
 import PageHeader from '../../components/PageHeader'
 import Btn from '../../components/Btn'
 import StatusPill from '../../components/StatusPill'
+import Calendar from '../../components/Calendar'
 
 const ERR = {
   padding: '10px 16px', background: '#ef444415', color: '#ef4444',
@@ -12,10 +14,22 @@ const ERR = {
   fontFamily: 'monospace', fontSize: 12,
 }
 
+function eachDate(startDate, endDate) {
+  const days = []
+  const cur = new Date(startDate)
+  const end = new Date(endDate)
+  while (cur <= end) {
+    days.push(cur.toISOString().slice(0, 10))
+    cur.setDate(cur.getDate() + 1)
+  }
+  return days
+}
+
 export default function MyAssignments() {
   const { user } = useAuth()
   const navigate  = useNavigate()
   const empId     = user?.employeeId ?? null
+  const [view, setView] = useState('calendar')
 
   const { data, loading, error } = useFetch(
     () => empId ? getMyAssignments(empId) : Promise.resolve([]),
@@ -23,6 +37,18 @@ export default function MyAssignments() {
   )
 
   const assignments = data ?? []
+
+  const events = useMemo(() => (
+    assignments
+      .filter(a => a.status === 'ACTIVE')
+      .flatMap(a => eachDate(a.startDate, a.endDate).map(d => ({
+        id: `${a.id}-${d}`,
+        title: `${a.contractTitle} · ${a.skillName}`,
+        start: `${d}T${a.plannedStartTime}`,
+        end:   `${d}T${a.plannedEndTime}`,
+        extendedProps: { assignment: a, workDate: d },
+      })))
+  ), [assignments])
 
   if (!empId) {
     return (
@@ -33,16 +59,30 @@ export default function MyAssignments() {
             Employee profile not linked to this account.
           </div>
           <div style={{ color: '#7a9ab0', fontFamily: 'monospace', fontSize: 11 }}>
-            Contact your manager to have your employee record associated with your login.
+            Contact HR to have your employee record associated with your login.
           </div>
         </div>
       </div>
     )
   }
 
+  function onEventClick(info) {
+    const { assignment, workDate } = info.event.extendedProps
+    navigate(`/my-worklogs/new?assignmentId=${assignment.id}&date=${workDate}`)
+  }
+
   return (
     <div>
-      <PageHeader title="My Assignments" subtitle="Active work assignments" />
+      <PageHeader
+        title="My Assignments"
+        subtitle="Active work assignments"
+        action={
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Btn small variant={view === 'calendar' ? 'primary' : 'ghost'} onClick={() => setView('calendar')}>CALENDAR</Btn>
+            <Btn small variant={view === 'list' ? 'primary' : 'ghost'} onClick={() => setView('list')}>LIST</Btn>
+          </div>
+        }
+      />
       <div style={{ padding: '24px 32px' }}>
         {error && <div style={ERR}>ERROR: {error}</div>}
 
@@ -52,6 +92,8 @@ export default function MyAssignments() {
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#7a9ab0', fontFamily: 'monospace', fontSize: 13 }}>
             No assignments found
           </div>
+        ) : view === 'calendar' ? (
+          <Calendar events={events} view="timeGridWeek" onEventClick={onEventClick} height={640} />
         ) : (
           <table>
             <thead>
@@ -80,10 +122,7 @@ export default function MyAssignments() {
                   <td><StatusPill value={a.status ?? 'ACTIVE'} /></td>
                   <td>
                     {a.status !== 'CANCELLED' && (
-                      <Btn
-                        small
-                        onClick={() => navigate(`/my-worklogs/new?assignmentId=${a.id}`)}
-                      >
+                      <Btn small onClick={() => navigate(`/my-worklogs/new?assignmentId=${a.id}`)}>
                         SUBMIT LOG
                       </Btn>
                     )}

@@ -34,6 +34,10 @@ public class ContractRequirement extends BaseEntity {
     @Column(name = "expected_hours_per_day", nullable = false, precision = 5, scale = 2)
     private BigDecimal expectedHoursPerDay;
 
+    @Column(name = "min_proficiency", nullable = false)
+    @Builder.Default
+    private int minProficiency = 1;
+
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 

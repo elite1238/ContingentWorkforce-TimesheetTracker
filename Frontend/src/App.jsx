@@ -1,33 +1,34 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
-import { ProtectedRoute } from './auth/ProtectedRoute'
+import { ProtectedRoute, RoleLanding } from './auth/ProtectedRoute'
 import Login from './pages/Login'
 import Shell from './components/Shell'
+
 import Dashboard from './pages/manager/Dashboard'
 import Clients from './pages/manager/Clients'
 import Contracts from './pages/manager/Contracts'
 import ContractDetail from './pages/manager/ContractDetail'
-import Employees from './pages/manager/Employees'
-import Skills from './pages/manager/Skills'
+import ManagerEmployees from './pages/manager/Employees'
 import WorklogApproval from './pages/manager/WorklogApproval'
-import Invoices from './pages/manager/Invoices'
+
 import MyAssignments from './pages/employee/MyAssignments'
 import MyWorklogs from './pages/employee/MyWorklogs'
 import SubmitWorklog from './pages/employee/SubmitWorklog'
 import MyAvailability from './pages/employee/MyAvailability'
 
-function M({ children }) {
-  return (
-    <ProtectedRoute role="MANAGER">
-      <Shell role="MANAGER">{children}</Shell>
-    </ProtectedRoute>
-  )
-}
+import HrEmployees from './pages/hr/Employees'
+import HrUsers from './pages/hr/Users'
+import HrRoles from './pages/hr/Roles'
+import HrSkills from './pages/hr/Skills'
 
-function E({ children }) {
+import FinanceWorklogs from './pages/finance/Worklogs'
+import FinanceInvoices from './pages/finance/Invoices'
+import FinanceMilestones from './pages/finance/Milestones'
+
+function Guard({ roles, children }) {
   return (
-    <ProtectedRoute role="EMPLOYEE">
-      <Shell role="EMPLOYEE">{children}</Shell>
+    <ProtectedRoute roles={roles}>
+      <Shell>{children}</Shell>
     </ProtectedRoute>
   )
 }
@@ -38,18 +39,33 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<M><Dashboard /></M>} />
-          <Route path="/clients" element={<M><Clients /></M>} />
-          <Route path="/contracts" element={<M><Contracts /></M>} />
-          <Route path="/contracts/:id" element={<M><ContractDetail /></M>} />
-          <Route path="/employees" element={<M><Employees /></M>} />
-          <Route path="/skills" element={<M><Skills /></M>} />
-          <Route path="/worklogs/pending" element={<M><WorklogApproval /></M>} />
-          <Route path="/invoices" element={<M><Invoices /></M>} />
-          <Route path="/my-assignments" element={<E><MyAssignments /></E>} />
-          <Route path="/my-worklogs" element={<E><MyWorklogs /></E>} />
-          <Route path="/my-worklogs/new" element={<E><SubmitWorklog /></E>} />
-          <Route path="/my-availability" element={<E><MyAvailability /></E>} />
+          <Route path="/" element={<RoleLanding />} />
+
+          {/* Manager */}
+          <Route path="/dashboard"        element={<Guard roles={['MANAGER']}><Dashboard /></Guard>} />
+          <Route path="/contracts"        element={<Guard roles={['MANAGER']}><Contracts /></Guard>} />
+          <Route path="/contracts/:id"    element={<Guard roles={['MANAGER','FINANCE_MANAGER']}><ContractDetail /></Guard>} />
+          <Route path="/clients"          element={<Guard roles={['MANAGER']}><Clients /></Guard>} />
+          <Route path="/employees"        element={<Guard roles={['MANAGER']}><ManagerEmployees /></Guard>} />
+          <Route path="/worklogs/pending" element={<Guard roles={['MANAGER']}><WorklogApproval /></Guard>} />
+
+          {/* Employee */}
+          <Route path="/my-assignments"   element={<Guard roles={['EMPLOYEE']}><MyAssignments /></Guard>} />
+          <Route path="/my-worklogs"      element={<Guard roles={['EMPLOYEE']}><MyWorklogs /></Guard>} />
+          <Route path="/my-worklogs/new"  element={<Guard roles={['EMPLOYEE']}><SubmitWorklog /></Guard>} />
+          <Route path="/my-availability"  element={<Guard roles={['EMPLOYEE']}><MyAvailability /></Guard>} />
+
+          {/* HR */}
+          <Route path="/hr/employees"     element={<Guard roles={['HR_MANAGER']}><HrEmployees /></Guard>} />
+          <Route path="/hr/users"         element={<Guard roles={['HR_MANAGER']}><HrUsers /></Guard>} />
+          <Route path="/hr/roles"         element={<Guard roles={['HR_MANAGER']}><HrRoles /></Guard>} />
+          <Route path="/hr/skills"        element={<Guard roles={['HR_MANAGER']}><HrSkills /></Guard>} />
+
+          {/* Finance */}
+          <Route path="/finance/worklogs"   element={<Guard roles={['FINANCE_MANAGER']}><FinanceWorklogs /></Guard>} />
+          <Route path="/finance/invoices"   element={<Guard roles={['FINANCE_MANAGER']}><FinanceInvoices /></Guard>} />
+          <Route path="/finance/milestones" element={<Guard roles={['FINANCE_MANAGER']}><FinanceMilestones /></Guard>} />
+
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>

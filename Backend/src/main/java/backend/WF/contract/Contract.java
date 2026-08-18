@@ -1,5 +1,6 @@
 package backend.WF.contract;
 
+import backend.WF.billing.BillingTypeEntity;
 import backend.WF.common.BaseEntity;
 import backend.WF.company.ClientCompany;
 import jakarta.persistence.*;
@@ -27,9 +28,13 @@ public class Contract extends BaseEntity {
 
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "billing_type", nullable = false, length = 20)
-    private BillingType billingType;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "billing_type_id", nullable = false)
+    private BillingTypeEntity billingType;
+
+    public String getBillingCode() {
+        return billingType != null ? billingType.getCode() : null;
+    }
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;

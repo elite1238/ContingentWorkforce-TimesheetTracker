@@ -46,6 +46,9 @@ public class Invoice extends BaseEntity {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    @Column(name = "milestone_id")
+    private UUID milestoneId;
+
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InvoiceLineItem> lineItems = new ArrayList<>();

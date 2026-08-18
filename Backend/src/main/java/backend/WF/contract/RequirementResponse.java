@@ -17,6 +17,7 @@ public class RequirementResponse {
     private int requiredEmployeeCount;
     private BigDecimal hourlyRate;
     private BigDecimal expectedHoursPerDay;
+    private int minProficiency;
     private LocalDate startDate;
     private LocalDate endDate;
     private int fulfilledCount;

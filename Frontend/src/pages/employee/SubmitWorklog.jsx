@@ -31,7 +31,8 @@ export default function SubmitWorklog() {
   const navigate    = useNavigate()
   const [params]    = useSearchParams()
   const empId       = user?.employeeId ?? null
-  const prefilledId = params.get('assignmentId') ?? ''
+  const prefilledId   = params.get('assignmentId') ?? ''
+  const prefilledDate = params.get('date') ?? ''
 
   const { data: assignments, loading: asgLoading, error: asgError } = useFetch(
     () => empId ? getMyAssignments(empId) : Promise.resolve([]),
@@ -39,7 +40,7 @@ export default function SubmitWorklog() {
   )
 
   const [assignmentId, setAssignmentId] = useState(prefilledId)
-  const [workDate, setWorkDate]         = useState('')
+  const [workDate, setWorkDate]         = useState(prefilledDate)
   const [segments, setSegments]         = useState([newSegment()])
   const [submitError, setSubmitError]   = useState(null)
   const [submitting, setSubmitting]     = useState(false)

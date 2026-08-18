@@ -38,6 +38,12 @@ public class InvoiceController {
         return ResponseEntity.ok(ApiResponse.ok(invoiceService.getInvoicesByContract(contractId)));
     }
 
+    @GetMapping("/api/invoices")
+    @PreAuthorize("hasAuthority('VIEW_INVOICES')")
+    public ResponseEntity<ApiResponse<List<InvoiceResponse>>> getAllInvoices() {
+        return ResponseEntity.ok(ApiResponse.ok(invoiceService.getAllInvoices()));
+    }
+
     @GetMapping("/api/invoices/{id}")
     @PreAuthorize("hasAuthority('VIEW_INVOICES')")
     public ResponseEntity<ApiResponse<InvoiceResponse>> getInvoice(@PathVariable UUID id) {

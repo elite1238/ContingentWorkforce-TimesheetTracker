@@ -27,12 +27,16 @@ public class SkillMatchSpecification implements AssignmentSpecification {
                 .orElseThrow(() -> new EntityNotFoundException("ContractRequirement", requirementId));
 
         UUID requiredSkillId = requirement.getSkill().getId();
-        boolean hasSkill = employeeSkillRepository.existsByEmployeeIdAndSkillId(employeeId, requiredSkillId);
+        int minProficiency = requirement.getMinProficiency();
+        boolean qualifies = employeeSkillRepository
+                .existsByEmployeeIdAndSkillIdAndProficiencyLevelGreaterThanEqual(
+                        employeeId, requiredSkillId, minProficiency);
 
-        if (!hasSkill) {
+        if (!qualifies) {
             throw new BusinessRuleViolationException(
-                    "Employee " + employeeId + " does not have the required skill: "
-                    + requirement.getSkill().getName());
+                    "Employee " + employeeId + " lacks required skill '"
+                    + requirement.getSkill().getName()
+                    + "' at proficiency ≥ " + minProficiency);
         }
     }
 }

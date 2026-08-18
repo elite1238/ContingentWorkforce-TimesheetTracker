@@ -13,6 +13,10 @@ public interface WorkLogRepository extends JpaRepository<WorkLog, UUID> {
 
     List<WorkLog> findByEmployeeId(UUID employeeId);
 
+    List<WorkLog> findByEmployeeIdAndWorkDateBetween(UUID employeeId, LocalDate from, LocalDate to);
+
+    List<WorkLog> findByStatus(WorkLogStatus status);
+
     List<WorkLog> findByEmployeeIdAndWorkDate(UUID employeeId, LocalDate workDate);
 
     List<WorkLog> findByAssignmentIdAndStatus(UUID assignmentId, WorkLogStatus status);

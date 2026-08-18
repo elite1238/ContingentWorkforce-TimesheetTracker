@@ -7,6 +7,7 @@ import backend.WF.contract.Contract;
 import backend.WF.contract.ContractRepository;
 import backend.WF.exception.BusinessRuleViolationException;
 import backend.WF.exception.EntityNotFoundException;
+import backend.WF.milestone.ContractMilestone;
 import backend.WF.security.CurrentUserService;
 import backend.WF.security.User;
 import backend.WF.worklog.WorkLog;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -42,15 +44,13 @@ public class InvoiceService {
                     "Invoice already exists for this contract and period");
         }
 
-        // Only approved work logs feed into invoicing
         List<WorkLog> approvedLogs = workLogRepository.findApprovedLogsForContract(
                 request.getContractId(), request.getPeriodStart(), request.getPeriodEnd());
 
-        InvoiceCalculationStrategy strategy = billingStrategyRegistry.resolve(contract.getBillingType());
+        InvoiceCalculationStrategy strategy = billingStrategyRegistry.resolve(contract.getBillingCode());
         List<InvoiceLineItem> lineItems = strategy.calculate(
                 contract, approvedLogs, request.getPeriodStart(), request.getPeriodEnd());
 
-        // Server-side total — never from client
         BigDecimal totalAmount = lineItems.stream()
                 .map(InvoiceLineItem::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -64,6 +64,41 @@ public class InvoiceService {
                 .totalAmount(totalAmount)
                 .status(InvoiceStatus.DRAFT)
                 .generatedBy(currentUser.getId())
+                .build();
+        invoice = invoiceRepository.save(invoice);
+
+        final Invoice savedInvoice = invoice;
+        for (InvoiceLineItem item : lineItems) {
+            item.setInvoice(savedInvoice);
+        }
+        savedInvoice.setLineItems(lineItems);
+        invoice = invoiceRepository.save(savedInvoice);
+
+        return toResponse(invoice);
+    }
+
+    @Transactional
+    @Auditable(action = "GENERATE_MILESTONE_INVOICE", entityType = "Invoice")
+    public InvoiceResponse generateMilestoneInvoice(ContractMilestone milestone) {
+        Contract contract = milestone.getContract();
+        InvoiceCalculationStrategy strategy = billingStrategyRegistry.resolve(contract.getBillingCode());
+        List<InvoiceLineItem> lineItems = strategy.calculateForMilestone(contract, milestone);
+
+        BigDecimal totalAmount = lineItems.stream()
+                .map(InvoiceLineItem::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        User currentUser = currentUserService.getCurrentUser();
+        LocalDate today = LocalDate.now();
+
+        Invoice invoice = Invoice.builder()
+                .contract(contract)
+                .periodStart(today)
+                .periodEnd(today)
+                .totalAmount(totalAmount)
+                .status(InvoiceStatus.DRAFT)
+                .generatedBy(currentUser.getId())
+                .milestoneId(milestone.getId())
                 .build();
         invoice = invoiceRepository.save(invoice);
 
@@ -101,6 +136,13 @@ public class InvoiceService {
     }
 
     @Transactional(readOnly = true)
+    public List<InvoiceResponse> getAllInvoices() {
+        return invoiceRepository.findAll().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public InvoiceResponse getInvoice(UUID invoiceId) {
         return toResponse(invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new EntityNotFoundException("Invoice", invoiceId)));
@@ -126,6 +168,7 @@ public class InvoiceService {
                 .totalAmount(inv.getTotalAmount())
                 .status(inv.getStatus())
                 .approvedAt(inv.getApprovedAt())
+                .milestoneId(inv.getMilestoneId())
                 .lineItems(items)
                 .build();
     }

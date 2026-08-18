@@ -149,6 +149,20 @@ public class WorkLogService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<WorkLogResponse> getMyWorkLogsBetween(UUID employeeId, LocalDate from, LocalDate to) {
+        return workLogRepository.findByEmployeeIdAndWorkDateBetween(employeeId, from, to).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkLogResponse> getByStatus(WorkLogStatus status) {
+        return workLogRepository.findByStatus(status).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private WorkLogResponse toResponse(WorkLog wl) {
         List<WorkLogResponse.SegmentResponse> segResponses = wl.getSegments().stream()
                 .map(s -> WorkLogResponse.SegmentResponse.builder()
