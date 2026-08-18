@@ -24,4 +24,6 @@ public class MilestoneResponse {
     private UUID approvedByUserId;
     private LocalDateTime approvedAt;
     private UUID invoiceId;
+    private int totalTasks;
+    private int completedTasks;
 }

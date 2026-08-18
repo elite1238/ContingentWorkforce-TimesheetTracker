@@ -22,6 +22,7 @@ import java.util.UUID;
 public class MilestoneService {
 
     private final MilestoneRepository milestoneRepository;
+    private final MilestoneTaskRepository milestoneTaskRepository;
     private final ContractRepository contractRepository;
     private final InvoiceService invoiceService;
     private final CurrentUserService currentUserService;
@@ -52,6 +53,15 @@ public class MilestoneService {
         if (milestone.getStatus() != MilestoneStatus.PENDING) {
             throw new BusinessRuleViolationException(
                     "Only PENDING milestones can be marked reached. Current status: " + milestone.getStatus());
+        }
+
+        long totalTasks = milestoneTaskRepository.countByMilestoneId(milestoneId);
+        if (totalTasks > 0) {
+            long incomplete = milestoneTaskRepository.countByMilestoneIdAndStatusNot(milestoneId, TaskStatus.DONE);
+            if (incomplete > 0) {
+                throw new BusinessRuleViolationException(
+                        "Milestone has " + incomplete + " incomplete task(s). Complete all tasks first.");
+            }
         }
 
         User currentUser = currentUserService.getCurrentUser();
@@ -97,6 +107,8 @@ public class MilestoneService {
     }
 
     private MilestoneResponse toResponse(ContractMilestone m) {
+        List<MilestoneTask> tasks = m.getTasks();
+        int completedTasks = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.DONE).count();
         return MilestoneResponse.builder()
                 .id(m.getId())
                 .contractId(m.getContract().getId())
@@ -111,6 +123,8 @@ public class MilestoneService {
                 .approvedByUserId(m.getApprovedByUserId())
                 .approvedAt(m.getApprovedAt())
                 .invoiceId(m.getInvoiceId())
+                .totalTasks(tasks.size())
+                .completedTasks(completedTasks)
                 .build();
     }
 }

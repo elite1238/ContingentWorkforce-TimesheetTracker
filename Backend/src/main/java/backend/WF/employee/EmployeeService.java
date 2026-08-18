@@ -110,6 +110,7 @@ public class EmployeeService {
 
         return EmployeeResponse.builder()
                 .id(employee.getId())
+                .userId(employee.getUser().getId())
                 .firstName(employee.getFirstName())
                 .lastName(employee.getLastName())
                 .email(employee.getEmail())
