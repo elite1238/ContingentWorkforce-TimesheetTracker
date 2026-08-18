@@ -20,6 +20,7 @@ import Drawer from "../../components/Drawer";
 import Btn from "../../components/Btn";
 import StatusPill from "../../components/StatusPill";
 import Calendar from "../../components/Calendar";
+import AutoAssignDrawer from "./AutoAssignDrawer";
 
 const ERR = {
   padding: "10px 16px",
@@ -119,6 +120,8 @@ export default function ContractDetail() {
   const [msForm, setMsForm] = useState(EMPTY_MILESTONE);
   const [msError, setMsError] = useState(null);
   const [msSaving, setMsSaving] = useState(false);
+
+  const [autoAssignOpen, setAutoAssignOpen] = useState(false);
 
   const [actionError, setActionError] = useState(null);
 
@@ -340,16 +343,27 @@ export default function ContractDetail() {
         <div style={SECTION}>
           <div style={SEC_HEAD}>
             <span>REQUIREMENTS</span>
-            <Btn
-              small
-              onClick={() => {
-                setReqForm(EMPTY_REQ);
-                setReqError(null);
-                setReqDrawer(true);
-              }}
-            >
-              + ADD REQUIREMENT
-            </Btn>
+            <div style={{ display: "flex", gap: 8 }}>
+              {reqs.some((r) => r.remainingSlots > 0) && (
+                <Btn
+                  small
+                  variant="approve"
+                  onClick={() => setAutoAssignOpen(true)}
+                >
+                  AUTO ASSIGN
+                </Btn>
+              )}
+              <Btn
+                small
+                onClick={() => {
+                  setReqForm(EMPTY_REQ);
+                  setReqError(null);
+                  setReqDrawer(true);
+                }}
+              >
+                + ADD REQUIREMENT
+              </Btn>
+            </div>
           </div>
           {requirements.loading ? (
             <div
@@ -838,6 +852,17 @@ export default function ContractDetail() {
           </Btn>
         </form>
       </Drawer>
+
+      {/* Auto Assign Drawer */}
+      <AutoAssignDrawer
+        contractId={id}
+        open={autoAssignOpen}
+        onClose={() => setAutoAssignOpen(false)}
+        onSuccess={() => {
+          requirements.reload();
+          assignmentsAll.reload();
+        }}
+      />
 
       {/* Add Milestone Drawer */}
       <Drawer
