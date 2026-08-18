@@ -86,7 +86,7 @@ public class InvoiceService {
     @Auditable(action = "GENERATE_MILESTONE_INVOICE", entityType = "Invoice")
     public InvoiceResponse generateMilestoneInvoice(ContractMilestone milestone) {
         Contract contract = milestone.getContract();
-        InvoiceCalculationStrategy strategy = billingStrategyRegistry.resolve(contract.getBillingCode());
+        InvoiceCalculationStrategy strategy = billingStrategyRegistry.resolve("MILESTONE");
         List<InvoiceLineItem> lineItems = strategy.calculateForMilestone(contract, milestone);
 
         BigDecimal totalAmount = lineItems.stream()

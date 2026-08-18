@@ -3,8 +3,8 @@ spring:
     name: WF
   datasource:
     url: jdbc:postgresql://localhost:5432/workforce_db
-    username: postgres
-    password: postgres
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -18,15 +18,15 @@ spring:
     enabled: false
 
 jwt:
-  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  secret: ${JWT_SECRET:change-me-not-a-real-secret}
   expiration-ms: 86400000
 
 server:
   port: 8080
 
 resend:
-  api-key: ae_ddqjzEAT_KbtREgedreWQiuwx31wNSTcB
-  from: vendor@projectbuild.me
+  api-key: ${RESEND_API_KEY:}
+  from: ${RESEND_FROM:vendor@projectbuild.me}
 
 springdoc:
   api-docs:

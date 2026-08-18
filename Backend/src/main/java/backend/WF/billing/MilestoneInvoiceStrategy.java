@@ -6,6 +6,7 @@ import backend.WF.milestone.ContractMilestone;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -25,6 +26,8 @@ public class MilestoneInvoiceStrategy implements InvoiceCalculationStrategy {
                 .unitRate(amount)
                 .amount(amount)
                 .build();
-        return List.of(line);
+        List<InvoiceLineItem> items = new ArrayList<>();
+        items.add(line);
+        return items;
     }
 }

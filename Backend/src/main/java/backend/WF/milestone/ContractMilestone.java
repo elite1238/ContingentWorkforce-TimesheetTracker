@@ -7,6 +7,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -53,4 +55,8 @@ public class ContractMilestone extends BaseEntity {
 
     @Column(name = "invoice_id")
     private UUID invoiceId;
+
+    @OneToMany(mappedBy = "milestone", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<MilestoneTask> tasks = new ArrayList<>();
 }
