@@ -1,1 +1,1 @@
-Project Repo for Vendor Management Tool
+Project Repo for VendorManagement Tool
