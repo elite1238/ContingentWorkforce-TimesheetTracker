@@ -1,0 +1,16 @@
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Backend/ALLOCATION_REFACTOR.md
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Backend/ENV_SETUP.md
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Backend/src/main/resources/application-dev.yml
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Backend/src/main/resources/application-prod.yml
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Backend/src/main/resources/application.yml
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Frontend/PRODUCT.md
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Frontend/README.md
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Frontend/index.html
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/MyContext/Idea.md
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/README.md
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Frontend/public/favicon.svg
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Frontend/public/icons.svg
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Frontend/src/assets/hero.png
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Frontend/src/assets/react.svg
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/Frontend/src/assets/vite.svg
+/home/shivesh/ShiveshData/DEV/WorkDayHack/ContingentWorkforce-TimesheetTracker/architecture.png

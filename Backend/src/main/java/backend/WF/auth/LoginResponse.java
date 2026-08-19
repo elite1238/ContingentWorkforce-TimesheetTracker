@@ -10,6 +10,7 @@ import java.util.List;
 public class LoginResponse {
 
     private String token;
+    private String refreshToken;
     private String username;
     private String employeeId;
     private List<String> roles;

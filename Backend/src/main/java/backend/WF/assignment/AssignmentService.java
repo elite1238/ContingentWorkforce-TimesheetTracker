@@ -14,7 +14,6 @@ import backend.WF.employee.EmployeeService;
 import backend.WF.exception.BusinessRuleViolationException;
 import backend.WF.exception.EntityNotFoundException;
 import jakarta.persistence.EntityManager;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +24,6 @@ import java.time.LocalTime;
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 public class AssignmentService {
 
     private final AssignmentRepository assignmentRepository;
@@ -34,9 +32,23 @@ public class AssignmentService {
     private final SpecificationChain specificationChain;
     private final EmployeeService employeeService;
     private final EntityManager entityManager;
-
-    @Qualifier("scoringStrategy")
     private final AllocationStrategy allocationStrategy;
+
+    public AssignmentService(AssignmentRepository assignmentRepository,
+                              EmployeeRepository employeeRepository,
+                              ContractRequirementRepository requirementRepository,
+                              SpecificationChain specificationChain,
+                              EmployeeService employeeService,
+                              EntityManager entityManager,
+                              @Qualifier("scoringStrategy") AllocationStrategy allocationStrategy) {
+        this.assignmentRepository = assignmentRepository;
+        this.employeeRepository = employeeRepository;
+        this.requirementRepository = requirementRepository;
+        this.specificationChain = specificationChain;
+        this.employeeService = employeeService;
+        this.entityManager = entityManager;
+        this.allocationStrategy = allocationStrategy;
+    }
 
     /**
      * THE single method permitted to persist an Assignment.
