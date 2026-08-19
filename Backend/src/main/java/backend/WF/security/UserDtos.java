@@ -22,7 +22,7 @@ public class UserDtos {
     public static class CreateRequest {
         @NotBlank private String username;
         @NotBlank @Email private String email;
-        @NotBlank @Size(min = 6, message = "Password must be at least 6 characters")
+        @PasswordStrength
         private String password;
         private Set<UUID> roleIds;
     }
@@ -38,7 +38,8 @@ public class UserDtos {
     @Setter
     @NoArgsConstructor
     public static class PasswordReset {
-        @NotBlank @Size(min = 6) private String password;
+        @PasswordStrength
+        private String password;
     }
 
     @Getter
