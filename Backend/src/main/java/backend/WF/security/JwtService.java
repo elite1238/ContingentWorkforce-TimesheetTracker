@@ -28,12 +28,39 @@ public class JwtService {
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+        return generateAccessToken(extraClaims, userDetails);
+    }
+
+    public String generateAccessToken(UserDetails userDetails) {
+        return generateAccessToken(new HashMap<>(), userDetails);
+    }
+
+    public String generateAccessToken(Map<String, Object> extraClaims, UserDetails userDetails) {
         String jti = UUID.randomUUID().toString();
         long nowMs = System.currentTimeMillis();
-        long expirationMs = nowMs + jwtProperties.getExpirationMs();
+        long expirationMs = nowMs + jwtProperties.getAccessExpirationMs();
 
         Map<String, Object> claims = new HashMap<>(extraClaims);
         claims.put("jti", jti);
+        claims.put("type", "access");
+
+        return Jwts.builder()
+                .claims(claims)
+                .subject(userDetails.getUsername())
+                .issuedAt(new Date(nowMs))
+                .expiration(new Date(expirationMs))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        String jti = UUID.randomUUID().toString();
+        long nowMs = System.currentTimeMillis();
+        long expirationMs = nowMs + jwtProperties.getRefreshExpirationMs();
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("jti", jti);
+        claims.put("type", "refresh");
 
         return Jwts.builder()
                 .claims(claims)
@@ -68,6 +95,22 @@ public class JwtService {
         }
 
         return true;
+    }
+
+    public boolean isRefreshTokenValid(String token, UserDetails userDetails) {
+        String username = extractUsername(token);
+        String tokenType = extractClaim(token, claims -> (String) claims.get("type"));
+
+        if (!username.equals(userDetails.getUsername()) || !"refresh".equals(tokenType)) {
+            return false;
+        }
+
+        if (isTokenExpired(token)) {
+            return false;
+        }
+
+        String jti = extractClaim(token, claims -> (String) claims.get("jti"));
+        return jti == null || !tokenBlacklistRepository.existsByTokenJti(jti);
     }
 
     private boolean isTokenExpired(String token) {

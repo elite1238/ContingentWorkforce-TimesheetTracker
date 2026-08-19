@@ -34,7 +34,8 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-        String token = jwtService.generateToken(userDetails);
+        String accessToken = jwtService.generateAccessToken(userDetails);
+        String refreshToken = jwtService.generateRefreshToken(userDetails);
 
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + request.getUsername()));
@@ -56,7 +57,8 @@ public class AuthService {
         }
 
         return LoginResponse.builder()
-                .token(token)
+                .token(accessToken)
+                .refreshToken(refreshToken)
                 .username(user.getUsername())
                 .employeeId(employeeId)
                 .roles(roles)
@@ -82,5 +84,17 @@ public class AuthService {
                 .build();
 
         tokenBlacklistRepository.save(blacklistedToken);
+    }
+
+    @Transactional(readOnly = true)
+    public String refresh(String refreshToken) {
+        String username = jwtService.extractUsername(refreshToken);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+        if (!jwtService.isRefreshTokenValid(refreshToken, userDetails)) {
+            throw new IllegalArgumentException("Invalid or expired refresh token");
+        }
+
+        return jwtService.generateAccessToken(userDetails);
     }
 }
