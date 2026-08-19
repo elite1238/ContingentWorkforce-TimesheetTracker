@@ -54,11 +54,7 @@ public class SecurityConfig {
                                 .preload(true))
                         .contentSecurityPolicy(csp -> csp
                                 .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:"))
-                        .xssProtection(xss -> xss
-                                .and()
-                                .block(true))
-                        .frameOptions(frame -> frame.deny())
-                        .contentTypeOptions(AbstractHttpConfigurer::disable))
+                        .frameOptions(frame -> frame.deny()))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

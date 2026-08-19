@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
-import { getMyAssignments } from "../../api";
+import { getMyAssignments, getMyTasks, updateTaskStatus } from "../../api";
 import { useFetch } from "../../hooks/useFetch";
 import PageHeader from "../../components/PageHeader";
 import Btn from "../../components/Btn";
@@ -39,6 +39,18 @@ export default function MyAssignments() {
     () => (empId ? getMyAssignments(empId) : Promise.resolve([])),
     [empId],
   );
+  const myTasks = useFetch(getMyTasks, []);
+  const [taskActionError, setTaskActionError] = useState(null);
+
+  async function handleTaskStatus(taskId, status) {
+    setTaskActionError(null);
+    try {
+      await updateTaskStatus(taskId, status);
+      myTasks.reload();
+    } catch (err) {
+      setTaskActionError(err?.response?.data?.message ?? "Failed to update task");
+    }
+  }
 
   const assignments = data ?? [];
 
@@ -178,6 +190,54 @@ export default function MyAssignments() {
                       >
                         SUBMIT LOG
                       </Btn>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* My Tasks */}
+      <div style={{ margin: "0 32px 32px", background: "#0d1b2a", border: "1px solid #1e3a4a", borderRadius: 3 }}>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e3a4a", fontFamily: "ui-monospace, Consolas, monospace", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#7a9ab0" }}>
+          MY TASKS
+        </div>
+        {(taskActionError || myTasks.error) && (
+          <div style={{ ...ERR, margin: "12px 16px 0" }}>ERROR: {taskActionError || myTasks.error}</div>
+        )}
+        {myTasks.loading ? (
+          <div style={{ padding: 16, color: "#7a9ab0", fontFamily: "monospace", fontSize: 12 }}>Loading...</div>
+        ) : (myTasks.data ?? []).length === 0 ? (
+          <div style={{ padding: 16, color: "#7a9ab0", fontFamily: "monospace", fontSize: 12 }}>No tasks assigned to you</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Milestone</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(myTasks.data ?? []).map(t => (
+                <tr key={t.id}>
+                  <td style={{ color: t.status === "DONE" ? "#3a5a6a" : "#f0f2f5", textDecoration: t.status === "DONE" ? "line-through" : "none" }}>
+                    {t.parentId && <span style={{ color: "#3a5a6a", marginRight: 6 }}>↳</span>}
+                    {t.name}
+                  </td>
+                  <td style={{ color: "#7a9ab0", fontSize: 11, fontFamily: "monospace" }}>{t.milestoneId}</td>
+                  <td>
+                    <StatusPill value={t.status} />
+                  </td>
+                  <td style={{ display: "flex", gap: 6 }}>
+                    {t.status === "PENDING" && (
+                      <Btn small variant="ghost" onClick={() => handleTaskStatus(t.id, "IN_PROGRESS")}>START</Btn>
+                    )}
+                    {t.status !== "DONE" && (
+                      <Btn small variant="approve" onClick={() => handleTaskStatus(t.id, "DONE")}>MARK DONE</Btn>
                     )}
                   </td>
                 </tr>

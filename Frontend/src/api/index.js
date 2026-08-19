@@ -81,6 +81,18 @@ export const approveMilestone = (id) => api.put(`/milestones/${id}/approve`)
 export const getMilestonesByStatus = (status = 'REACHED') =>
   api.get('/milestones', { params: { status } })
 
+// Tasks
+export const getTasksByMilestone = (milestoneId) =>
+  api.get(`/milestones/${milestoneId}/tasks`)
+export const createRootTask = (milestoneId, data) =>
+  api.post(`/milestones/${milestoneId}/tasks`, data)
+export const createSubtask = (parentTaskId, data) =>
+  api.post(`/tasks/${parentTaskId}/subtasks`, data)
+export const updateTaskStatus = (taskId, status) =>
+  api.put(`/tasks/${taskId}/status`, { status })
+export const deleteTask = (taskId) => api.delete(`/tasks/${taskId}`)
+export const getMyTasks = () => api.get('/tasks/mine')
+
 // Roles
 export const getRoles = () => api.get('/roles')
 export const createRole = (data) => api.post('/roles', data)

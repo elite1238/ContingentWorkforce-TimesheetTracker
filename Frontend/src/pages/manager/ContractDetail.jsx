@@ -13,6 +13,11 @@ import {
   getMilestonesByContract,
   createMilestone,
   markMilestoneReached,
+  getTasksByMilestone,
+  createRootTask,
+  createSubtask,
+  updateTaskStatus,
+  getEmployees,
 } from "../../api";
 import { useFetch } from "../../hooks/useFetch";
 import PageHeader from "../../components/PageHeader";
@@ -124,6 +129,18 @@ export default function ContractDetail() {
   const [autoAssignOpen, setAutoAssignOpen] = useState(false);
 
   const [actionError, setActionError] = useState(null);
+
+  // Task management
+  const [taskMs, setTaskMs] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [taskError, setTaskError] = useState(null);
+  const [addTaskForm, setAddTaskForm] = useState({ name: '', assignedToUserId: '' });
+  const [addingTask, setAddingTask] = useState(false);
+  const [subtaskOf, setSubtaskOf] = useState(null);
+  const [addSubForm, setAddSubForm] = useState({ name: '', assignedToUserId: '' });
+  const [addingSubtask, setAddingSubtask] = useState(false);
+  const users = useFetch(getEmployees, []);
 
   const c = contract.data;
   const reqs = requirements.data ?? [];
@@ -280,6 +297,79 @@ export default function ContractDetail() {
       setActionError(
         err?.response?.data?.message ?? err?.message ?? "Mark failed",
       );
+    }
+  }
+
+  async function openTaskDrawer(ms) {
+    setTaskMs(ms);
+    setTaskError(null);
+    setSubtaskOf(null);
+    setAddTaskForm({ name: '', assignedToUserId: '' });
+    setTasksLoading(true);
+    try {
+      const list = await getTasksByMilestone(ms.id);
+      setTasks(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setTaskError(err?.response?.data?.message ?? 'Failed to load tasks');
+    } finally {
+      setTasksLoading(false);
+    }
+  }
+
+  async function reloadTasks(msId) {
+    try {
+      const list = await getTasksByMilestone(msId);
+      setTasks(Array.isArray(list) ? list : []);
+      milestones.reload();
+    } catch (err) {
+      setTaskError(err?.response?.data?.message ?? 'Failed to reload tasks');
+    }
+  }
+
+  async function handleAddTask(e) {
+    e.preventDefault();
+    setAddingTask(true);
+    setTaskError(null);
+    try {
+      await createRootTask(taskMs.id, {
+        name: addTaskForm.name,
+        assignedToUserId: addTaskForm.assignedToUserId || undefined,
+      });
+      setAddTaskForm({ name: '', assignedToUserId: '' });
+      await reloadTasks(taskMs.id);
+    } catch (err) {
+      setTaskError(err?.response?.data?.message ?? 'Failed to add task');
+    } finally {
+      setAddingTask(false);
+    }
+  }
+
+  async function handleAddSubtask(e) {
+    e.preventDefault();
+    setAddingSubtask(true);
+    setTaskError(null);
+    try {
+      await createSubtask(subtaskOf, {
+        name: addSubForm.name,
+        assignedToUserId: addSubForm.assignedToUserId || undefined,
+      });
+      setSubtaskOf(null);
+      setAddSubForm({ name: '', assignedToUserId: '' });
+      await reloadTasks(taskMs.id);
+    } catch (err) {
+      setTaskError(err?.response?.data?.message ?? 'Failed to add subtask');
+    } finally {
+      setAddingSubtask(false);
+    }
+  }
+
+  async function handleTaskStatus(taskId, status) {
+    setTaskError(null);
+    try {
+      await updateTaskStatus(taskId, status);
+      await reloadTasks(taskMs.id);
+    } catch (err) {
+      setTaskError(err?.response?.data?.message ?? 'Failed to update task');
     }
   }
 
@@ -504,6 +594,7 @@ export default function ContractDetail() {
                     <th>Label</th>
                     <th>Threshold %</th>
                     <th>Amount</th>
+                    <th>Tasks</th>
                     <th>Status</th>
                     <th>Marked At</th>
                     <th>Actions</th>
@@ -524,41 +615,41 @@ export default function ContractDetail() {
                       <td style={{ color: "#ff6b00", fontWeight: 700 }}>
                         ${Number(m.amount).toFixed(2)}
                       </td>
+                      <td style={{ fontFamily: "monospace", fontSize: 11 }}>
+                        {m.totalTasks > 0 ? (
+                          <span style={{ color: m.completedTasks === m.totalTasks ? "#00c851" : "#7a9ab0" }}>
+                            {m.completedTasks}/{m.totalTasks}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#3a5a6a" }}>—</span>
+                        )}
+                      </td>
                       <td>
                         <StatusPill value={m.status} />
                       </td>
                       <td>
                         {m.markedAt?.replace("T", " ").slice(0, 16) ?? "—"}
                       </td>
-                      <td>
+                      <td style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         {m.status === "PENDING" && (
-                          <Btn
-                            small
-                            variant="approve"
-                            onClick={() => handleMarkReached(m.id)}
-                          >
-                            MARK REACHED
-                          </Btn>
+                          <>
+                            <Btn small variant="ghost" onClick={() => openTaskDrawer(m)}>
+                              TASKS
+                            </Btn>
+                            {m.totalTasks === 0 && (
+                              <Btn small variant="approve" onClick={() => handleMarkReached(m.id)}>
+                                MARK REACHED
+                              </Btn>
+                            )}
+                          </>
                         )}
                         {m.status === "REACHED" && (
-                          <span
-                            style={{
-                              color: "#fab43c",
-                              fontFamily: "monospace",
-                              fontSize: 11,
-                            }}
-                          >
+                          <span style={{ color: "#fab43c", fontFamily: "monospace", fontSize: 11 }}>
                             AWAITING FINANCE
                           </span>
                         )}
                         {m.status === "APPROVED_INVOICED" && (
-                          <span
-                            style={{
-                              color: "#00c851",
-                              fontFamily: "monospace",
-                              fontSize: 11,
-                            }}
-                          >
+                          <span style={{ color: "#00c851", fontFamily: "monospace", fontSize: 11 }}>
                             INVOICED
                           </span>
                         )}
@@ -864,6 +955,74 @@ export default function ContractDetail() {
         }}
       />
 
+      {/* Task Management Drawer */}
+      <Drawer
+        open={!!taskMs}
+        onClose={() => setTaskMs(null)}
+        title={taskMs ? `TASKS · ${taskMs.label}` : "TASKS"}
+        width={520}
+      >
+        {taskError && <div style={ERR}>ERROR: {taskError}</div>}
+        {tasksLoading ? (
+          <div style={{ color: "#7a9ab0", fontFamily: "monospace", fontSize: 12, marginBottom: 16 }}>
+            Loading...
+          </div>
+        ) : tasks.length === 0 ? (
+          <div style={{ color: "#7a9ab0", fontFamily: "monospace", fontSize: 12, marginBottom: 16 }}>
+            No tasks yet. Add one below.
+          </div>
+        ) : (
+          <div style={{ marginBottom: 20 }}>
+            {tasks.filter(t => !t.parentId).map(root => (
+              <TaskRow
+                key={root.id}
+                task={root}
+                subtasks={tasks.filter(t => t.parentId === root.id)}
+                users={users.data ?? []}
+                subtaskOf={subtaskOf}
+                addSubForm={addSubForm}
+                addingSubtask={addingSubtask}
+                onStatus={handleTaskStatus}
+                onAddSubtask={setSubtaskOf}
+                onSubFormChange={setAddSubForm}
+                onSubSubmit={handleAddSubtask}
+              />
+            ))}
+          </div>
+        )}
+        <div style={{ borderTop: "1px solid #1e3a4a", paddingTop: 16 }}>
+          <div style={{ ...LABEL, marginBottom: 10 }}>ADD TASK</div>
+          <form onSubmit={handleAddTask}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <div>
+                <label style={LABEL}>Name</label>
+                <input
+                  value={addTaskForm.name}
+                  onChange={e => setAddTaskForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Task name"
+                  required
+                />
+              </div>
+              <div>
+                <label style={LABEL}>Assign To</label>
+                <select
+                  value={addTaskForm.assignedToUserId}
+                  onChange={e => setAddTaskForm(f => ({ ...f, assignedToUserId: e.target.value }))}
+                >
+                  <option value="">— Unassigned —</option>
+                  {(users.data ?? []).filter(e => e.userId).map(e => (
+                    <option key={e.userId} value={e.userId}>{e.firstName} {e.lastName}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <Btn type="submit" small disabled={addingTask}>
+              {addingTask ? "ADDING..." : "+ ADD TASK"}
+            </Btn>
+          </form>
+        </div>
+      </Drawer>
+
       {/* Add Milestone Drawer */}
       <Drawer
         open={msDrawer}
@@ -946,6 +1105,69 @@ export default function ContractDetail() {
       </Drawer>
     </div>
   );
+}
+
+function TaskRow({ task, subtasks, users, subtaskOf, addSubForm, addingSubtask, onStatus, onAddSubtask, onSubFormChange, onSubSubmit }) {
+  const statusColor = task.status === 'DONE' ? '#00c851' : task.status === 'IN_PROGRESS' ? '#fab43c' : '#7a9ab0'
+  const assignedUser = users.find(e => e.userId === task.assignedToUserId)
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#0d1b2a', border: '1px solid #1e3a4a', borderRadius: 3 }}>
+        <span style={{ flex: 1, fontFamily: 'monospace', fontSize: 12, color: task.status === 'DONE' ? '#3a5a6a' : '#f0f2f5', textDecoration: task.status === 'DONE' ? 'line-through' : 'none' }}>
+          {task.name}
+        </span>
+        {assignedUser && (
+          <span style={{ fontSize: 10, color: '#7a9ab0', fontFamily: 'monospace' }}>{assignedUser.firstName} {assignedUser.lastName}</span>
+        )}
+        <span style={{ fontSize: 10, fontFamily: 'monospace', color: statusColor, fontWeight: 700 }}>{task.status}</span>
+        {task.status === 'PENDING' && (
+          <Btn small variant="ghost" onClick={() => onStatus(task.id, 'IN_PROGRESS')}>START</Btn>
+        )}
+        {task.status !== 'DONE' && (
+          <Btn small variant="approve" onClick={() => onStatus(task.id, 'DONE')}>DONE</Btn>
+        )}
+        {task.status !== 'DONE' && (
+          <Btn small variant="ghost" onClick={() => onAddSubtask(subtaskOf === task.id ? null : task.id)}>+ SUB</Btn>
+        )}
+      </div>
+      {subtaskOf === task.id && (
+        <form onSubmit={onSubSubmit} style={{ display: 'flex', gap: 8, padding: '6px 10px 6px 24px', background: '#08131c', border: '1px solid #1e3a4a', borderTop: 'none' }}>
+          <input
+            value={addSubForm.name}
+            onChange={e => onSubFormChange(f => ({ ...f, name: e.target.value }))}
+            placeholder="Subtask name"
+            required
+            style={{ flex: 1, fontSize: 11 }}
+          />
+          <select
+            value={addSubForm.assignedToUserId}
+            onChange={e => onSubFormChange(f => ({ ...f, assignedToUserId: e.target.value }))}
+            style={{ fontSize: 11, width: 120 }}
+          >
+            <option value="">Unassigned</option>
+            {users.filter(e => e.userId).map(e => <option key={e.userId} value={e.userId}>{e.firstName} {e.lastName}</option>)}
+          </select>
+          <Btn small type="submit" disabled={addingSubtask}>{addingSubtask ? '...' : 'ADD'}</Btn>
+        </form>
+      )}
+      {subtasks.map(sub => (
+        <div key={sub.id} style={{ paddingLeft: 20 }}>
+          <TaskRow
+            task={sub}
+            subtasks={[]}
+            users={users}
+            subtaskOf={subtaskOf}
+            addSubForm={addSubForm}
+            addingSubtask={addingSubtask}
+            onStatus={onStatus}
+            onAddSubtask={onAddSubtask}
+            onSubFormChange={onSubFormChange}
+            onSubSubmit={onSubSubmit}
+          />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function RequirementRow({ req, onAssign, onCancel }) {

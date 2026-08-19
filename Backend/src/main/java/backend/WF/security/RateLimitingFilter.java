@@ -40,7 +40,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                 filterChain.doFilter(request, response);
             } else {
                 log.warn("Rate limit exceeded for IP: {}", clientKey);
-                response.setStatus(HttpServletResponse.SC_TOO_MANY_REQUESTS);
+                response.setStatus(429);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\": \"Too many login attempts. Try again later.\"}");
                 response.getWriter().flush();
