@@ -57,6 +57,7 @@ HELP.md
 
 # OS
 .DS_Store
+.env
 .env.local
 .env.*.local
 Thumbs.db
@@ -69,3 +70,4 @@ Thumbs.db
 *.sw?
 
 /MyContext
+/Backend/graphify-out/

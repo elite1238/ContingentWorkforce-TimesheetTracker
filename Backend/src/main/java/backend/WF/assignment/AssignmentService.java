@@ -1,5 +1,6 @@
 package backend.WF.assignment;
 
+import backend.WF.allocation.strategy.AllocationStrategy;
 import backend.WF.audit.Auditable;
 import backend.WF.assignment.specification.SpecificationChain;
 import backend.WF.common.DateRange;
@@ -12,10 +13,9 @@ import backend.WF.employee.EmployeeResponse;
 import backend.WF.employee.EmployeeService;
 import backend.WF.exception.BusinessRuleViolationException;
 import backend.WF.exception.EntityNotFoundException;
-import backend.WF.skill.EmployeeSkill;
-import backend.WF.skill.EmployeeSkillRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +23,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,7 +34,9 @@ public class AssignmentService {
     private final SpecificationChain specificationChain;
     private final EmployeeService employeeService;
     private final EntityManager entityManager;
-    private final EmployeeSkillRepository employeeSkillRepository;
+
+    @Qualifier("scoringStrategy")
+    private final AllocationStrategy allocationStrategy;
 
     /**
      * THE single method permitted to persist an Assignment.
@@ -161,6 +162,7 @@ public class AssignmentService {
     /**
      * Suggest assignments for all unfulfilled slots in a contract.
      * Read-only — does not persist anything.
+     * Uses AllocationStrategy to rank eligible candidates.
      */
     @Transactional(readOnly = true)
     public List<SuggestedAssignmentItem> suggestAssignments(UUID contractId) {
@@ -172,20 +174,17 @@ public class AssignmentService {
             if (req.remainingSlots() <= 0) continue;
 
             DateRange dateRange = new DateRange(req.getStartDate(), req.getEndDate());
-
-            List<Employee> eligible = employeeRepository.findByActiveTrue().stream()
-                    .filter(emp -> !claimed.contains(emp.getId()))
-                    .filter(emp -> specificationChain.isSatisfied(emp.getId(), req.getId(), dateRange, List.of()))
-                    .collect(Collectors.toList());
-
             LocalTime defaultStart = LocalTime.of(9, 0);
             long totalMinutes = req.getExpectedHoursPerDay().multiply(BigDecimal.valueOf(60)).longValue();
             LocalTime defaultEnd = defaultStart.plusMinutes(totalMinutes);
 
             for (int slot = 1; slot <= req.remainingSlots(); slot++) {
-                Optional<Employee> best = eligible.stream()
-                        .filter(emp -> !claimed.contains(emp.getId()))
-                        .max(Comparator.comparingDouble(emp -> scoreEmployee(emp.getId(), req)));
+                List<UUID> candidates = allocationStrategy.selectCandidates(
+                        req.getId(), 1, dateRange);
+
+                Optional<UUID> best = candidates.stream()
+                        .filter(empId -> !claimed.contains(empId))
+                        .findFirst();
 
                 if (best.isEmpty()) {
                     suggestions.add(SuggestedAssignmentItem.builder()
@@ -199,15 +198,17 @@ public class AssignmentService {
                             .plannedEndTime(defaultEnd)
                             .build());
                 } else {
-                    Employee emp = best.get();
-                    claimed.add(emp.getId());
+                    UUID empId = best.get();
+                    claimed.add(empId);
+                    Employee emp = employeeRepository.findById(empId)
+                            .orElseThrow(() -> new EntityNotFoundException("Employee", empId));
+
                     suggestions.add(SuggestedAssignmentItem.builder()
                             .requirementId(req.getId())
                             .skillName(req.getSkill().getName())
                             .slotIndex(slot)
-                            .employeeId(emp.getId())
+                            .employeeId(empId)
                             .employeeName(emp.getFullName())
-                            .score(scoreEmployee(emp.getId(), req))
                             .status("SUGGESTED")
                             .startDate(req.getStartDate())
                             .endDate(req.getEndDate())
@@ -219,19 +220,6 @@ public class AssignmentService {
         }
 
         return suggestions;
-    }
-
-    private double scoreEmployee(UUID employeeId, ContractRequirement req) {
-        int proficiency = employeeSkillRepository
-                .findByEmployeeIdAndSkillId(employeeId, req.getSkill().getId())
-                .map(EmployeeSkill::getProficiencyLevel)
-                .orElse(1);
-        double profScore = (proficiency / 5.0) * 0.6;
-
-        int activeCount = assignmentRepository.findByEmployeeIdAndStatus(employeeId, AssignmentStatus.ACTIVE).size();
-        double loadScore = Math.max(0.0, 1.0 - activeCount / 10.0) * 0.4;
-
-        return profScore + loadScore;
     }
 
     /**
