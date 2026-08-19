@@ -1,9 +1,6 @@
 package backend.WF.auth;
 
-import backend.WF.security.CustomUserDetailsService;
-import backend.WF.security.JwtService;
-import backend.WF.security.User;
-import backend.WF.security.UserRepository;
+import backend.WF.security.*;
 import backend.WF.exception.EntityNotFoundException;
 import backend.WF.employee.Employee;
 import backend.WF.employee.EmployeeRepository;
@@ -14,6 +11,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +26,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final TokenBlacklistRepository tokenBlacklistRepository;
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
@@ -61,5 +62,25 @@ public class AuthService {
                 .roles(roles)
                 .permissions(permissions)
                 .build();
+    }
+
+    @Transactional
+    public void logout(String token) {
+        String jti = jwtService.extractJti(token);
+        if (jti == null) {
+            return;
+        }
+
+        String username = jwtService.extractUsername(token);
+        Date expiration = jwtService.extractExpiration(token);
+
+        TokenBlacklist blacklistedToken = TokenBlacklist.builder()
+                .tokenJti(jti)
+                .username(username)
+                .blacklistedAt(OffsetDateTime.now())
+                .expiresAt(Instant.ofEpochMilli(expiration.getTime()).atOffset(OffsetDateTime.now().getOffset()))
+                .build();
+
+        tokenBlacklistRepository.save(blacklistedToken);
     }
 }
